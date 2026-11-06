@@ -241,3 +241,6 @@ class handler(BaseHTTPRequestHandler):
             })
 
         return actions, waf_status
+
+# تعريف متغير app المطلوب حصراً في أعلى ملف Vercel Python Runtime
+app = handler
