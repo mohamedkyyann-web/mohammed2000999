@@ -1,8 +1,12 @@
 from flask import Flask, render_template_string, request, jsonify
-import asyncio, httpx, random, urllib3
+import asyncio
+import httpx
+import random
+import urllib3
 
 urllib3.disable_warnings()
 
+# تعريف مثيل الفلاسك في المستوى الأعلى ليتم اكتشافه فوراً بواسطة Vercel
 app = Flask(__name__)
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
