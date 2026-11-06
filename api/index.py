@@ -185,7 +185,6 @@ def index(path):
         
         target = clean_url(raw)
         
-        # تشغيل الدالة غير المتزامنة بسلاسة مع Flask
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         actions, waf_status = loop.run_until_complete(execute_ultimate_engine(target))
