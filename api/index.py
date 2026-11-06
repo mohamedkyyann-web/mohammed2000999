@@ -1,36 +1,16 @@
-from http.server import BaseHTTPRequestHandler
-import json, asyncio, httpx, random, urllib3, sqlite3, time
-from urllib.parse import urlparse
+from flask import Flask, render_template_string, request, jsonify
+import asyncio, httpx, random, urllib3
 
 urllib3.disable_warnings()
 
-def init_db():
-    try:
-        conn = sqlite3.connect('v400_ultimate_command.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ultimate_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                target TEXT,
-                module TEXT,
-                severity TEXT,
-                details TEXT,
-                timestamp TEXT
-            )
-        ''')
-        conn.commit()
-        conn.close()
-    except:
-        pass
-
-init_db()
+app = Flask(__name__)
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - Ultimate Strike Command</title>
+<title>V400 Flask القائد الأعظم - Ultimate Strike Command</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000003;color:#00ff88;font-family:'Courier New',Consolas,monospace;min-height:100vh;padding:20px}
@@ -62,11 +42,11 @@ button:disabled{opacity:0.5}
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - ترسانة الاجتياح المطلق ⚔️</h1>
+<h1>⚔️ V400 Flask القائد الأعظم - ترسانة الاجتياح المطلق ⚔️</h1>
 <div class="badges">
+<span class="badge">Flask Framework Engine</span>
 <span class="badge">Advanced Proxy Spoofing</span>
-<span class="badge">Massive Surveillance Payload Engine</span>
-<span class="badge">SQLite Warfare DB v4.0</span>
+<span class="badge">Surveillance Payload Engine</span>
 </div>
 <div class="panel">
 <div class="input-group">
@@ -131,116 +111,86 @@ def clean_url(raw):
         s = 'https://' + s
     return s.rstrip('/')
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin','*')
-        self.send_header('Access-Control-Allow-Methods','POST, OPTIONS, GET')
-        self.send_header('Access-Control-Allow-Headers','Content-Type')
-        self.end_headers()
+async def execute_ultimate_engine(target):
+    actions = []
+    waf_status = "Dynamic Perimeter Guard"
+    fake_ip = f"{random.randint(10,200)}.{random.randint(1,254)}.{random.randint(1,254)}.{random.randint(1,254)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) V400-Flask-Strike/4.0",
+        "X-Forwarded-For": fake_ip,
+        "X-Real-IP": fake_ip,
+        "Connection": "close"
+    }
 
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(HTML_COMMAND_CENTER.encode('utf-8'))
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=10.0, headers=headers, follow_redirects=True) as client:
+            res = await client.get(target)
+            srv = res.headers.get('server', '').lower()
+            if 'cloudflare' in srv: waf_status = "Cloudflare Shield (Bypass Attempted)"
 
-    def do_POST(self):
-        self.send_response(200)
-        self.send_header('Content-Type','application/json; charset=utf-8')
-        self.end_headers()
+            ultimate_paths = [
+                "/live/ch0_0.jpg", "/snapshot.jpg", "/cgi-bin/snapshot.cgi",
+                "/streaming/channels/1", "/onvif/device_service", "/webcam",
+                "/video.cgi", "/mjpeg", "/axis-cgi/mjpg/video.cgi", "/admin/login.asp",
+                "/config/config.json", "/api/v1/stream"
+            ]
+
+            tasks = [client.get(target.rstrip('/') + p, timeout=3.0) for p in ultimate_paths]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for path, r in zip(ultimate_paths, responses):
+                if isinstance(r, httpx.Response):
+                    if r.status_code == 200:
+                        actions.append({
+                            "type": f"ULTIMATE BREACH DETECTED: {path}",
+                            "severity": "Critical",
+                            "desc": "تم اختراق المسار بنجاح واستجابة الهدف برمز 200 بدون حجب.",
+                            "proof": f"URL: {r.url} | Status: 200 OK | Size: {len(r.content)}"
+                        })
+                    elif r.status_code == 403:
+                        actions.append({
+                            "type": f"FIREWALL BLOCK: {path}",
+                            "severity": "Medium",
+                            "desc": "جدار الحماية للهدف تصدى للطلب وأعاد رمز 403.",
+                            "proof": f"URL: {r.url} | Status: 403 Forbidden"
+                        })
+
+            if not actions:
+                actions.append({
+                    "type": "Ultimate Strike Completed",
+                    "severity": "Low",
+                    "desc": "تم إطلاق الهجوم الشامل عبر Flask، وتبين أن الأهداف والمنافذ مغلقة.",
+                    "proof": f"Main Target Status: {res.status_code} | Server Shield: {srv or 'Active'}"
+                })
+
+    except Exception as e:
+        actions.append({
+            "type": "Strike Connection Error",
+            "severity": "Low",
+            "desc": "تعذر إكمال الاتصال بالهدف بسبب الحجب العنيف أو انقطاع المهلة.",
+            "proof": str(e)
+        })
+
+    return actions, waf_status
+
+@app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
+@app.route('/<path:path>', methods=['GET', 'POST'])
+def index(path):
+    if request.method == 'POST':
         try:
-            length = int(self.headers.get('content-length',0))
-            if length > 0:
-                body_data = json.loads(self.rfile.read(length).decode('utf-8'))
-                raw = body_data.get('url','')
-            else:
-                raw = 'https://example.com'
-            target = clean_url(raw)
+            body_data = request.get_json(silent=True) or {}
+            raw = body_data.get('url', 'https://example.com')
         except:
-            target = 'https://example.com'
-
+            raw = 'https://example.com'
+        
+        target = clean_url(raw)
+        
+        # تشغيل الدالة غير المتزامنة بسلاسة مع Flask
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        actions, waf_status = loop.run_until_complete(self.execute_ultimate_engine(target))
+        actions, waf_status = loop.run_until_complete(execute_ultimate_engine(target))
         loop.close()
-
-        self.wfile.write(json.dumps({"url": target, "waf_status": waf_status, "actions": actions}, ensure_ascii=False).encode('utf-8'))
-
-    async def execute_ultimate_engine(self, target):
-        actions = []
-        waf_status = "Dynamic Perimeter Guard"
-        fake_ip = f"{random.randint(10,200)}.{random.randint(1,254)}.{random.randint(1,254)}.{random.randint(1,254)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) V400-Ultimate-Strike/4.0",
-            "X-Forwarded-For": fake_ip,
-            "X-Real-IP": fake_ip,
-            "X-Client-IP": fake_ip,
-            "Connection": "close"
-        }
-
-        try:
-            async with httpx.AsyncClient(verify=False, timeout=12.0, headers=headers, follow_redirects=True) as client:
-                res = await client.get(target)
-                srv = res.headers.get('server', '').lower()
-                if 'cloudflare' in srv: waf_status = "Cloudflare Shield (Bypass Attempted)"
-
-                ultimate_paths = [
-                    "/live/ch0_0.jpg", "/snapshot.jpg", "/cgi-bin/snapshot.cgi",
-                    "/streaming/channels/1", "/onvif/device_service", "/webcam",
-                    "/video.cgi", "/mjpeg", "/axis-cgi/mjpg/video.cgi", "/admin/login.asp",
-                    "/config/config.json", "/api/v1/stream", "/view/viewer_index.shtml"
-                ]
-
-                tasks = [client.get(target.rstrip('/') + p, timeout=3.5) for p in ultimate_paths]
-                responses = await asyncio.gather(*tasks, return_exceptions=True)
-
-                try:
-                    conn = sqlite3.connect('v400_ultimate_command.db')
-                    cursor = conn.cursor()
-                    for path, r in zip(ultimate_paths, responses):
-                        if isinstance(r, httpx.Response):
-                            if r.status_code == 200:
-                                severity = "Critical"
-                                actions.append({
-                                    "type": f"ULTIMATE BREACH DETECTED: {path}",
-                                    "severity": severity,
-                                    "desc": "تم اختراق المسار بنجاح واستجابة الهدف برمز 200 بدون حجب.",
-                                    "proof": f"URL: {r.url} | Status: 200 OK | Size: {len(r.content)}"
-                                })
-                                cursor.execute(
-                                    "INSERT INTO ultimate_logs (target, module, severity, details, timestamp) VALUES (?, ?, ?, ?, ?)",
-                                    (target, path, "Critical", f"Status 200 on {path}", time.ctime())
-                                )
-                            elif r.status_code == 403:
-                                actions.append({
-                                    "type": f"FIREWALL BLOCK: {path}",
-                                    "severity": "Medium",
-                                    "desc": "جدار الحماية للهدف تصدى للطلب وأعاد رمز 403.",
-                                    "proof": f"URL: {r.url} | Status: 403 Forbidden"
-                                })
-                    conn.commit()
-                    conn.close()
-                except:
-                    pass
-
-                if not actions:
-                    actions.append({
-                        "type": "Ultimate Strike Completed",
-                        "severity": "Low",
-                        "desc": "تم إطلاق الهجوم الشامل، وتبين أن الأهداف والمنافذ مغلقة ومحصنة.",
-                        "proof": f"Main Target Status: {res.status_code} | Server Shield: {srv or 'Active'}"
-                    })
-
-        except Exception as e:
-            actions.append({
-                "type": "Strike Connection Error",
-                "severity": "Low",
-                "desc": "تعذر إكمال الاتصال بالهدف بسبب الحجب العنيف أو انقطاع المهلة.",
-                "proof": str(e)
-            })
-
-        return actions, waf_status
-
-# تعريف متغير app المطلوب حصراً في أعلى ملف Vercel Python Runtime
-app = handler
+        
+        return jsonify({"url": target, "waf_status": waf_status, "actions": actions})
+    
+    return render_template_string(HTML_COMMAND_CENTER)
