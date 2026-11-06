@@ -4,22 +4,24 @@ from urllib.parse import urlparse
 
 urllib3.disable_warnings()
 
-# تهيئة قاعدة البيانات العسكرية الشاملة للنسخة 400
 def init_db():
-    conn = sqlite3.connect('v400_ultimate_command.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ultimate_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            target TEXT,
-            module TEXT,
-            severity TEXT,
-            details TEXT,
-            timestamp TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('v400_ultimate_command.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ultimate_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target TEXT,
+                module TEXT,
+                severity TEXT,
+                details TEXT,
+                timestamp TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    except:
+        pass
 
 init_db()
 
@@ -88,7 +90,7 @@ async function runUltimateCommand(){
  results.innerHTML='';
 
  try{
-   const res = await fetch('/api/warfare', {
+   const res = await fetch('/api/index', {
      method:'POST',
      headers:{'Content-Type':'application/json'},
      body: JSON.stringify({url:url})
@@ -183,7 +185,6 @@ class handler(BaseHTTPRequestHandler):
                 srv = res.headers.get('server', '').lower()
                 if 'cloudflare' in srv: waf_status = "Cloudflare Shield (Bypass Attempted)"
 
-                # بنك مسارات كاميرات المراقبة وأنظمة الإدارة المكثف
                 ultimate_paths = [
                     "/live/ch0_0.jpg", "/snapshot.jpg", "/cgi-bin/snapshot.cgi",
                     "/streaming/channels/1", "/onvif/device_service", "/webcam",
@@ -194,33 +195,34 @@ class handler(BaseHTTPRequestHandler):
                 tasks = [client.get(target.rstrip('/') + p, timeout=3.5) for p in ultimate_paths]
                 responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-                conn = sqlite3.connect('v400_ultimate_command.db')
-                cursor = conn.cursor()
-
-                for path, r in zip(ultimate_paths, responses):
-                    if isinstance(r, httpx.Response):
-                        if r.status_code == 200:
-                            severity = "Critical"
-                            actions.append({
-                                "type": f"ULTIMATE BREACH DETECTED: {path}",
-                                "severity": severity,
-                                "desc": "تم اختراق المسار بنجاح واستجابة الهدف برمز 200 بدون حجب.",
-                                "proof": f"URL: {r.url} | Status: 200 OK | Size: {len(r.content)}"
-                            })
-                            cursor.execute(
-                                "INSERT INTO ultimate_logs (target, module, severity, details, timestamp) VALUES (?, ?, ?, ?, ?)",
-                                (target, path, "Critical", f"Status 200 on {path}", time.ctime())
-                            )
-                        elif r.status_code == 403:
-                            actions.append({
-                                "type": f"FIREWALL BLOCK: {path}",
-                                "severity": "Medium",
-                                "desc": "جدار الحماية للهدف تصدى للطلب وأعاد رمز 403.",
-                                "proof": f"URL: {r.url} | Status: 403 Forbidden"
-                            })
-
-                conn.commit()
-                conn.close()
+                try:
+                    conn = sqlite3.connect('v400_ultimate_command.db')
+                    cursor = conn.cursor()
+                    for path, r in zip(ultimate_paths, responses):
+                        if isinstance(r, httpx.Response):
+                            if r.status_code == 200:
+                                severity = "Critical"
+                                actions.append({
+                                    "type": f"ULTIMATE BREACH DETECTED: {path}",
+                                    "severity": severity,
+                                    "desc": "تم اختراق المسار بنجاح واستجابة الهدف برمز 200 بدون حجب.",
+                                    "proof": f"URL: {r.url} | Status: 200 OK | Size: {len(r.content)}"
+                                })
+                                cursor.execute(
+                                    "INSERT INTO ultimate_logs (target, module, severity, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                    (target, path, "Critical", f"Status 200 on {path}", time.ctime())
+                                )
+                            elif r.status_code == 403:
+                                actions.append({
+                                    "type": f"FIREWALL BLOCK: {path}",
+                                    "severity": "Medium",
+                                    "desc": "جدار الحماية للهدف تصدى للطلب وأعاد رمز 403.",
+                                    "proof": f"URL: {r.url} | Status: 403 Forbidden"
+                                })
+                    conn.commit()
+                    conn.close()
+                except:
+                    pass
 
                 if not actions:
                     actions.append({
@@ -239,5 +241,3 @@ class handler(BaseHTTPRequestHandler):
             })
 
         return actions, waf_status
-
-app = handler
